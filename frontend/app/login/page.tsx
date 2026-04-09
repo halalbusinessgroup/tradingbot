@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, LANGS } from '@/lib/i18n';
+import { useTheme } from '@/lib/theme';
 
 // Map backend error strings → i18n keys
 function mapError(detail: string, t: (k: string) => string): string {
@@ -24,7 +25,8 @@ function mapError(detail: string, t: (k: string) => string): string {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, lang, setLang } = useI18n();
+  const { theme, toggle } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -93,10 +95,51 @@ export default function LoginPage() {
     }
   }
 
+  // ── Top bar with lang + theme ──────────────────────────────
+  const TopBar = () => (
+    <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
+      {/* Theme toggle */}
+      <button
+        onClick={toggle}
+        className="px-3 py-1.5 rounded-lg text-xs font-medium"
+        style={{
+          background: 'var(--panel)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+        }}
+        title={theme === 'dark' ? t('lightMode') : t('darkMode')}
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
+
+      {/* Language selector */}
+      <div className="flex items-center gap-1 px-2 py-1 rounded-lg"
+        style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
+        {LANGS.map(l => (
+          <button
+            key={l.code}
+            onClick={() => setLang(l.code)}
+            className="px-1.5 py-0.5 rounded text-xs font-bold transition-colors"
+            style={{
+              background: lang === l.code ? 'var(--accent)' : 'transparent',
+              color: lang === l.code ? '#000' : 'var(--text-muted)',
+              cursor: 'pointer',
+              border: 'none',
+            }}
+          >
+            {l.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   // ── Pending approval screen ──────────────────────────────
   if (step === 'pending') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
+        <TopBar />
         <div className="card w-full max-w-md space-y-5 text-center">
           <div className="text-6xl">⏳</div>
           <h1 className="text-xl font-bold">{t('pendingApprovalTitle')}</h1>
@@ -113,6 +156,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
+      <TopBar />
+
       <form
         onSubmit={submit}
         className="card w-full max-w-md space-y-5"
@@ -198,9 +243,6 @@ export default function LoginPage() {
               autoFocus
               autoComplete="one-time-code"
             />
-            <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-              Auto-submits when 6 digits entered
-            </p>
           </div>
         )}
 

@@ -1,38 +1,41 @@
-# 🤖 Trading Bot — Tam Sistem (Azərbaycan)
+# Trading Bot Platform
 
-Python (FastAPI) + Next.js + Binance Spot + Telegram + PostgreSQL + Celery + Redis əsaslı çox istifadəçili avtomatik trading bot platforması.
+A multi-user automated crypto trading platform built with Python (FastAPI) + Next.js + Binance Spot + Telegram + PostgreSQL + Celery + Redis.
 
-> ⚠️ **VACİB XƏBƏRDARLIQ:** Real pulla işə salmazdan əvvəl mütləq Binance Testnet-də sınayın. Bir kod xətası bütün balansı sıfırlaya bilər. `.env`-də `BINANCE_TESTNET=true` qoymaq kifayətdir — bütün kod eynidir.
-
----
-
-## ✨ Xüsusiyyətlər
-
-- 🔐 JWT autentifikasiya, AES (Fernet) ilə şifrələnmiş Binance açarları
-- 📊 İstifadəçi paneli: dashboard, açıq trade-lər, PnL, balans
-- 🎯 Strategiya konstruktoru (RSI, EMA, SMA, PRICE şərtləri)
-- 🔄 Celery + Redis ilə hər user üçün periodic worker
-- 📈 TradingView qrafiki frontend-də
-- 💱 Binance Spot — Market BUY + OCO (TP/SL) avtomatik
-- 🛡 Withdraw icazəli açar avtomatik rədd edilir
-- 📱 Ümumi Telegram bot — `/start <token>` ilə user bağlanma
-- 👑 Admin paneli — bütün userlər, statistika, blok/aktiv
-- 🐳 Docker Compose ilə tək komandada deploy
-- 🔒 Nginx + Let's Encrypt SSL prod konfiqurasiyası
+> **WARNING:** Always test on Binance Testnet before using real funds. A single misconfiguration can result in total balance loss. Set `BINANCE_TESTNET=true` in `.env` — all code is identical between testnet and live.
 
 ---
 
-## 📁 Layihə strukturu
+## Features
+
+- JWT authentication with AES (Fernet) encrypted Binance API keys
+- User dashboard: open trades, PnL, balance overview
+- Strategy builder with RSI, EMA, SMA, MACD, Bollinger Bands, and more
+- TradingView Webhook mode — trade when a TradingView alert fires
+- Celery + Redis periodic workers per user
+- TradingView chart integration in frontend
+- Binance Spot — Market BUY + OCO (TP/SL) auto-placement
+- Automatic rejection of API keys with Withdraw permission enabled
+- Telegram bot integration — users connect via `/start <token>`
+- Admin panel — all users, statistics, block/activate controls
+- 5-language i18n: English, Azerbaijani, Turkish, Russian, Arabic
+- Dark and light theme
+- Docker Compose single-command deployment
+- Nginx + Let's Encrypt SSL production configuration
+
+---
+
+## Project Structure
 
 ```
 trading-bot/
 ├── backend/              # FastAPI + Celery + SQLAlchemy
 │   ├── app/
 │   │   ├── api/          # REST endpoints (auth, users, strategies, trades, admin)
-│   │   ├── core/         # security (JWT, AES), deps
-│   │   ├── models/       # DB modelləri
-│   │   ├── schemas/      # Pydantic
-│   │   ├── services/     # Binance, Telegram, indicators, strategy_engine
+│   │   ├── core/         # security (JWT, AES), dependencies
+│   │   ├── models/       # Database models
+│   │   ├── schemas/      # Pydantic schemas
+│   │   ├── services/     # Binance, Telegram, indicators, strategy engine
 │   │   ├── workers/      # Celery tasks
 │   │   ├── config.py
 │   │   ├── database.py
@@ -40,7 +43,7 @@ trading-bot/
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env.example
-├── frontend/             # Next.js 14 (App Router) + Tailwind
+├── frontend/             # Next.js 14 (App Router) + Tailwind CSS
 │   ├── app/              # login, register, dashboard, strategy, trades, settings, admin
 │   ├── components/       # Nav, TradingViewWidget
 │   ├── lib/api.ts
@@ -52,222 +55,226 @@ trading-bot/
 
 ---
 
-## 🚀 BAŞLANĞIC — 5 DƏQİQƏDƏ LOKAL İŞƏ SALMAQ
+## Quick Start — Local (5 Minutes)
 
-### 1. Tələblər
-- Docker + Docker Compose (Docker Desktop bəs edir)
+### Requirements
+- Docker + Docker Compose (Docker Desktop is sufficient)
 - Git
 
-### 2. Repo-nu klonla / qovluğa keç
+### 1. Clone the repo
 ```bash
-cd trading-bot
+git clone https://github.com/halalbusinessgroup/tradingbot.git
+cd tradingbot
 ```
 
-### 3. `.env` faylını hazırla
+### 2. Prepare the `.env` file
 ```bash
 cp backend/.env.example backend/.env
 ```
 
-`backend/.env` faylını aç və **3 vacib şeyi** dəyiş:
+Open `backend/.env` and set the required values:
 
 ```env
-JWT_SECRET=istənilən_uzun_təsadüfi_string_buraya
-AES_KEY=Fernet_key_buraya
-TELEGRAM_BOT_TOKEN=BotFather_token
+JWT_SECRET=any_long_random_string_here
+AES_KEY=your_fernet_key_here
+TELEGRAM_BOT_TOKEN=your_botfather_token
 TELEGRAM_BOT_USERNAME=YourBotUsername
-ADMIN_EMAIL=sənin@email.com
-ADMIN_PASSWORD=GüclüParol123!
+ADMIN_EMAIL=your@email.com
+ADMIN_PASSWORD=StrongPassword123!
 BINANCE_TESTNET=true
 ```
 
-**AES_KEY-i necə yaradım?** Aşağıdakı komandanı işlət:
+**Generate AES_KEY:**
 ```bash
 docker run --rm python:3.11-slim python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
-Çıxan stringi `AES_KEY=`-dən sonra yapışdır.
 
-**JWT_SECRET üçün:**
+**Generate JWT_SECRET:**
 ```bash
 openssl rand -hex 32
 ```
 
-### 4. Telegram botu yarat (5 dəqiqə)
-1. Telegram-da `@BotFather`-i aç
-2. `/newbot` yaz
-3. Bot adı və username ver (məs: `MyTradingBot`, `mytrading_bot`)
-4. Verilən tokeni `TELEGRAM_BOT_TOKEN`-ə yapışdır
-5. Username-i (`@`-siz) `TELEGRAM_BOT_USERNAME`-ə yaz
+### 3. Create a Telegram Bot
+1. Open `@BotFather` on Telegram
+2. Send `/newbot` and follow the prompts
+3. Copy the token into `TELEGRAM_BOT_TOKEN`
+4. Copy the username (without `@`) into `TELEGRAM_BOT_USERNAME`
 
-### 5. İşə sal
+### 4. Start
 ```bash
 docker compose up -d --build
 ```
 
-İlk dəfə 3-5 dəqiqə çəkir (image-lər yığılır). Sonra:
+First run takes 3–5 minutes. Then check logs:
 
 ```bash
 docker compose logs -f backend
 ```
 
-Hər şey qaydasındadırsa görəcəksən: `Admin user created: ...` və `Application startup complete`.
+When ready you'll see: `Admin user created` and `Application startup complete`.
 
-### 6. Aç
+### 5. Open in browser
 - **Frontend:** http://localhost:3000
-- **Backend Swagger:** http://localhost:8000/docs
-
-Admin emaili və parolu ilə daxil ol → `/admin` paneli açılacaq.
+- **Backend Swagger UI:** http://localhost:8000/docs
 
 ---
 
-## 🧪 BINANCE TESTNET AÇARI ALMAQ (PULSUZ)
+## Binance Testnet API Key (Free)
 
-1. https://testnet.binance.vision saytına get
-2. Sağ üstdən GitHub və ya Google ilə daxil ol
-3. "Generate HMAC_SHA256 Key" düyməsinə bas
-4. **API Key** və **Secret Key** kopyala (bir də göstərilməyəcək!)
-5. Sayta veb-panelində: Settings → Binance API → açarları daxil et
-6. Sistem withdraw permission-u yoxlayır — testnet-də problemsizdir
+1. Go to https://testnet.binance.vision
+2. Sign in with GitHub or Google
+3. Click "Generate HMAC_SHA256 Key"
+4. Copy the **API Key** and **Secret Key** (shown only once)
+5. In the platform: Settings → Binance API → enter the keys
 
-Testnet-də sənin balansın **virtual 10,000 USDT-dir**, real pul deyil. Hər şeyi sınamaq üçün idealdır.
-
----
-
-## ⚙️ İLK DƏFƏ İSTİFADƏ — ADIM ADIM
-
-### Yeni user kimi:
-1. `/register` səhifəsində qeydiyyatdan keç
-2. **Settings** → Binance API açarını daxil et
-3. **Settings** → "Telegram bağla" → linki aç → botda görünən tokenlə `/start <token>` yaz → Telegram bağlanır
-4. **Strategy** → yeni strategiya yarat:
-   - Ad: "SOL RSI 30"
-   - Coin: SOLUSDT seç
-   - Məbləğ: 10 USDT
-   - TP: 5%, SL: 1%
-   - Maksimum açıq trade: 2
-   - Timeframe: 15m
-   - Şərt: RSI < 30
-5. **Dashboard** → "▶ Botu İşə Sal" düyməsinə bas
-6. Bot hər 30 saniyədə bütün strategiyaları yoxlayacaq
-7. Şərt ödənəndə BUY edəcək, OCO ilə TP/SL qoyacaq, Telegram bildiriş gələcək
-
-### Admin kimi:
-1. ADMIN_EMAIL/PASSWORD ilə daxil ol → `/admin` açılacaq
-2. Bütün userləri, statistikanı, açıq/bağlı trade-ləri görə bilərsən
-3. Hər useri blok edib aktivləşdirə bilərsən
+Your testnet balance is **virtual 10,000 USDT**. No real money involved.
 
 ---
 
-## 🧠 STRATEGİYA ÖRNƏKLƏRİ
+## How Strategy Indicators Work
 
-### 1. Sadə RSI Oversold
+The bot fetches OHLCV (candlestick) price data from Binance/Bybit via the `ccxt` library, then calculates indicators internally using the `ta` (technical analysis) Python library. Binance itself does not calculate indicators — the bot does the math locally, then places a Market BUY order via the Binance API when all conditions are met.
+
+| Indicator | What it measures | Common use |
+|-----------|-----------------|------------|
+| RSI | Momentum (0–100) | RSI < 30 = oversold, potential buy |
+| EMA / SMA | Moving average of price | Price > EMA(50) = uptrend |
+| MACD | Trend direction change | MACD crossover = entry signal |
+| BB_UPPER/LOWER | Bollinger Bands | Price near BB_LOWER = potential bounce |
+| ATR | Volatility | Used for dynamic SL sizing |
+| VOLUME | Trading volume | Confirms breakouts |
+
+### TradingView Webhook Mode
+Instead of using indicator conditions, you can set a strategy to **Webhook Mode**. The bot generates a unique webhook URL for each strategy. When a TradingView alert fires and sends a POST request to that URL, the bot immediately places a buy order on the configured coins.
+
+This lets you use TradingView's full Pine Script capabilities as your signal engine, while the bot handles order execution automatically.
+
+---
+
+## First-Time Usage Guide
+
+### As a regular user:
+1. Register at `/register`
+2. Go to **Settings** → Enter your Binance API key
+3. **Settings** → "Connect Telegram" → open the link → send `/start <token>` to the bot
+4. **Strategy** → Create a strategy:
+   - Name, Symbol (e.g. SOLUSDT), Amount (USDT), TP %, SL %
+   - Add entry conditions (e.g. RSI < 30) **or** enable TradingView Webhook Mode
+5. **Dashboard** → Click "Start Bot"
+
+### As an admin:
+1. Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`
+2. The `/admin` link appears in the navigation
+3. View all users, approve/block accounts, change roles
+
+---
+
+## Strategy Examples
+
+### 1. RSI Oversold
 ```
-Coin: BTCUSDT, ETHUSDT
-Şərt: RSI(14) < 30
+Symbol: BTCUSDT
+Condition: RSI(14) < 30
 TP: +3%, SL: -1.5%
 Timeframe: 15m
 ```
 
 ### 2. EMA Trend Following
 ```
-Coin: SOLUSDT
-Şərt 1: PRICE > EMA(50)
-Şərt 2: RSI(14) > 50
-Şərt 3: RSI(14) < 70
+Symbol: SOLUSDT
+Condition 1: PRICE > EMA(50)
+Condition 2: RSI(14) > 50
 TP: +5%, SL: -2%
 ```
 
-### 3. Aggressive Scalping
+### 3. TradingView Webhook
 ```
-Coin: SOLUSDT
-Şərt: RSI(7) < 25
-TP: +1.5%, SL: -0.7%
-Timeframe: 1m
+Symbol: ETHUSDT
+Mode: Webhook
+TP: +4%, SL: -2%
+→ Trade fires when TradingView alert hits the webhook URL
 ```
-
-> 📌 **Qayda:** Strategy-də ən azı 1 şərt olmalıdır, əks halda bot heç vaxt al-ver etmir (təhlükəsizlik).
 
 ---
 
-## 🌐 CANLI DEPLOY — VPS-də
+## Docker and IP Addresses
 
-### ADDIM 1 — Domain
-**Namecheap**, **Porkbun** və ya **Cloudflare Registrar**-da `.com` al ($8-12/il).
+Docker containers are assigned internal IPs that change on restart. This affects Binance API IP whitelisting.
 
-### ADDIM 2 — VPS
-**Hetzner Cloud** tövsiyə olunur (ən yaxşı qiymət/keyfiyyət):
-- hetzner.com/cloud → "Create Server"
-- **CX22**: 2 vCPU, 4GB RAM, 40GB SSD — €4.5/ay
+**Solution:** Whitelist your **VPS public IP**, not Docker's internal IP. On the VPS, run:
+```bash
+curl ifconfig.me
+```
+Use that IP in Binance API settings. The VPS public IP stays fixed — Docker internal IPs are irrelevant to Binance.
+
+On your local machine, whitelist your home/office public IP the same way.
+
+---
+
+## Production Deployment on a VPS
+
+### Step 1 — Domain
+Purchase a `.com` domain at Namecheap, Porkbun, or Cloudflare Registrar (~$8–12/year).
+
+### Step 2 — VPS (Hetzner Cloud recommended)
+- hetzner.com/cloud → Create Server
+- **CX22**: 2 vCPU, 4GB RAM, 40GB SSD — ~€4.5/month
 - Image: **Ubuntu 24.04**
-- SSH key əlavə et (lokal kompüterdə `ssh-keygen -t ed25519` ilə yarat)
-- Yarat → IP ünvanını al (məs: `78.47.123.45`)
+- Add SSH key (generate locally: `ssh-keygen -t ed25519`)
+- Note the server IP (e.g. `78.47.123.45`)
 
-### ADDIM 3 — DNS bağla
-Domain provayderində DNS panelində 3 A record əlavə et:
+### Step 3 — DNS
+Add A records in your domain DNS panel:
 ```
 @      A   78.47.123.45
 www    A   78.47.123.45
 api    A   78.47.123.45
 ```
-10-30 dəqiqə yayılma. Yoxla: `ping mytradingbot.com`
 
-### ADDIM 4 — VPS hazırlığı
+### Step 4 — VPS Setup
 ```bash
 ssh root@78.47.123.45
-
-# Sistem
 apt update && apt upgrade -y
-
-# Docker
 curl -fsSL https://get.docker.com | sh
-
-# Firewall
 ufw allow 22 && ufw allow 80 && ufw allow 443 && ufw enable
-
-# fail2ban
 apt install fail2ban -y
-
-# Yeni user (root ilə işləmə!)
 adduser trader
 usermod -aG sudo,docker trader
 su - trader
 ```
 
-### ADDIM 5 — Kodu çək
+### Step 5 — Deploy Code
 ```bash
-git clone https://github.com/SƏNİN_USERNAME/trading-bot.git
-cd trading-bot
+git clone https://github.com/halalbusinessgroup/tradingbot.git
+cd tradingbot
 cp backend/.env.example backend/.env
-nano backend/.env   # prod dəyərlər: BINANCE_TESTNET=false, güclü secret-lər
+nano backend/.env   # Set: BINANCE_TESTNET=false, strong secrets
 ```
 
-### ADDIM 6 — SSL (HTTPS pulsuz)
+### Step 6 — SSL (Free HTTPS)
 ```bash
 sudo apt install certbot -y
-sudo certbot certonly --standalone -d mytradingbot.com -d www.mytradingbot.com
+sudo certbot certonly --standalone -d yourdomain.com -d www.yourdomain.com
 ```
 
-`nginx/nginx.conf`-da `mytradingbot.com` öz domain-inlə əvəz et.
+Replace `yourdomain.com` in `nginx/nginx.conf` with your actual domain.
 
-### ADDIM 7 — İşə sal
+### Step 7 — Start
 ```bash
 docker compose up -d --build
-docker compose logs -f
 ```
 
-Bitdi! https://mytradingbot.com açılır.
-
-### ADDIM 8 — SSL avtomatik yenilənmə
+### Step 8 — Auto-renew SSL
 ```bash
 sudo crontab -e
-# əlavə et:
-0 3 * * * certbot renew --quiet && docker compose -f /home/trader/trading-bot/docker-compose.yml restart nginx
+# Add:
+0 3 * * * certbot renew --quiet && docker compose -f /home/trader/tradingbot/docker-compose.yml restart nginx
 ```
 
-### ADDIM 9 — Backup (vacib!)
+### Step 9 — Daily Database Backup
 ```bash
 sudo nano /etc/cron.daily/db-backup
 ```
-İçinə:
 ```bash
 #!/bin/bash
 mkdir -p /backups
@@ -278,102 +285,92 @@ find /backups -name "db_*.sql.gz" -mtime +14 -delete
 sudo chmod +x /etc/cron.daily/db-backup
 ```
 
-### ADDIM 10 — Monitoring
-- **UptimeRobot.com** — pulsuz, hər 5 dəqiqədə saytı yoxlayır, düşəndə email göndərir
-- **Sentry.io** — backend xəta tracking (pulsuz developer plan)
+### Step 10 — Monitoring
+- **UptimeRobot.com** — free uptime monitoring, alerts when site goes down
+- **Sentry.io** — backend error tracking (free plan)
 
 ---
 
-## 🔐 TƏHLÜKƏSİZLİK YOXLAMA
+## Updating the Platform
 
-- [ ] `.env` git-ə düşmür (`.gitignore`-da var)
-- [ ] `JWT_SECRET` ən az 32 simvol təsadüfi
-- [ ] `AES_KEY` Fernet ilə generasiya olunub
-- [ ] `ADMIN_PASSWORD` güclüdür (12+ simvol)
-- [ ] Binance açarında **withdraw deaktivdir** (sistem yoxlayır)
-- [ ] Production-da `BINANCE_TESTNET=false`
-- [ ] HTTPS məcburidir (Nginx redirect)
-- [ ] SSH parolu deaktivdir, yalnız key
-- [ ] root login qadağandır
-- [ ] fail2ban işləyir
-- [ ] DB backup hər gecə işləyir
-
----
-
-## 🛠 ƏMRLƏR (CHEAT SHEET)
+After making changes and pushing to GitHub, on the VPS:
 
 ```bash
-# Lokal başlat
-docker compose up -d --build
-
-# Loglar
-docker compose logs -f backend
-docker compose logs -f worker
-docker compose logs -f telegram_listener
-
-# Restart
-docker compose restart backend worker
-
-# DB-yə daxil ol
-docker compose exec postgres psql -U trader -d tradingbot
-
-# Bütün userləri sil (DİQQƏT!)
-docker compose exec postgres psql -U trader -d tradingbot -c "DELETE FROM users WHERE role='user';"
-
-# Yenidən qur
-docker compose down -v && docker compose up -d --build
+cd /home/trader/tradingbot
+git pull origin main
+docker compose up -d --build backend frontend
 ```
 
 ---
 
-## 📚 API SƏNƏDLƏRİ
+## Security Checklist
 
-Backend işə düşəndə avtomatik Swagger açılır:
+- [ ] `.env` is excluded from git (listed in `.gitignore`)
+- [ ] `JWT_SECRET` is at least 32 random characters
+- [ ] `AES_KEY` was generated with Fernet
+- [ ] `ADMIN_PASSWORD` is strong (12+ characters)
+- [ ] Binance API key has **Withdraw disabled** (system enforces this)
+- [ ] `BINANCE_TESTNET=false` in production
+- [ ] HTTPS is enforced via Nginx redirect
+- [ ] SSH password login is disabled — key only
+- [ ] root login is disabled
+- [ ] fail2ban is running
+- [ ] DB backup runs nightly
+
+---
+
+## Common Commands
+
+```bash
+# Start locally
+docker compose up -d --build
+
+# View logs
+docker compose logs -f backend
+docker compose logs -f worker
+
+# Access the database
+docker compose exec postgres psql -U trader -d tradingbot
+
+# Full rebuild (resets all data)
+docker compose down -v && docker compose up -d --build
+
+# Get your public IP (for Binance API whitelist)
+curl ifconfig.me
+```
+
+---
+
+## API Documentation
+
+Swagger UI is auto-generated when the backend is running:
 - http://localhost:8000/docs
 - http://localhost:8000/redoc
 
-Əsas endpointlər:
-- `POST /api/auth/register`
-- `POST /api/auth/login`
+Key endpoints:
+- `POST /api/auth/register` / `POST /api/auth/login`
 - `GET  /api/auth/me`
 - `POST /api/users/binance-key`
-- `POST /api/users/telegram-link`
 - `POST /api/users/bot/toggle`
 - `GET  /api/users/balance`
 - `GET/POST/PUT/DELETE /api/strategies`
-- `GET /api/trades`
-- `GET /api/trades/stats`
-- `GET /api/admin/users` (admin)
-- `GET /api/admin/stats` (admin)
+- `GET  /api/trades` / `GET /api/trades/stats`
+- `POST /api/webhook/{token}` _(TradingView webhook endpoint)_
+- `GET  /api/admin/users` _(admin only)_
+- `GET  /api/admin/stats` _(admin only)_
 
 ---
 
-## 🎯 GƏLƏCƏK ƏLAVƏLƏR
+## Legal Notice
 
-- Backtesting engine (tarixi dataya görə test)
-- Paper trading mode
-- Trailing Stop Loss
-- Partial Take Profit
-- Multi-exchange (Bybit, OKX) — `ccxt`-ə keçid
-- TradingView webhook (alert → trade)
-- Strategy marketplace
-- Copy trading
+This software is provided for **educational purposes only**. Automated trading carries significant financial risk. The authors are not responsible for any financial losses. Only trade with capital you can afford to lose.
 
 ---
 
-## ⚠️ HÜQUQİ QEYD
+## Troubleshooting
 
-Bu proqram **təhsil məqsədli**dir. Avtomatik ticarət **böyük risklə** bağlıdır. Müəllif heç bir maliyyə itkisinə görə cavabdeh deyil. Yalnız itirə biləcəyiniz məbləğdə işlədin.
-
----
-
-## 🆘 KÖMƏK
-
-Problem yaranarsa:
-1. `docker compose logs -f` ilə logları yoxla
-2. `backend/.env` faylının düzgün doldurulduğunu yoxla
-3. Binance API açarında withdraw deaktivdir?
-4. Telegram bot tokeni düzgündür?
-
-🚀 **Uğurlar!**
-# tradingbot
+1. Check logs: `docker compose logs -f`
+2. Verify `backend/.env` is correctly filled in
+3. Confirm Binance API key has Withdraw **disabled**
+4. Confirm the VPS public IP is whitelisted in Binance (not Docker's internal IP)
+5. Run `docker compose down && docker compose up -d --build` for a clean restart

@@ -25,6 +25,7 @@ const defaultForm = () => ({
   timeframe: '15m',
   exchange: 'binance',
   noConditions: false,
+  webhookMode: false,
   conditions: [{ indicator: 'RSI', period: 14, op: '<', value: 30 }],
   // Advanced
   trailingSl: '' as string | number,
@@ -80,6 +81,7 @@ export default function StrategyPage() {
       timeframe: cfg.timeframe || '15m',
       exchange: cfg.exchange || 'binance',
       noConditions: !cfg.entry_conditions || cfg.entry_conditions.length === 0,
+      webhookMode: !!cfg.webhook_mode,
       conditions: cfg.entry_conditions?.length ? cfg.entry_conditions : [{ indicator: 'RSI', period: 14, op: '<', value: 30 }],
       trailingSl: cfg.trailing_sl || '',
       paperMode: !!cfg.paper_mode,
@@ -98,7 +100,7 @@ export default function StrategyPage() {
     const c = coinInput.trim().toUpperCase();
     if (!c) return;
     if (form.symbols.includes(c)) {
-      show(`${c} artıq əlavə edilib`, 'warning');
+      show(`${c} ${t('alreadyAdded')}`, 'warning');
       return;
     }
     setValidating(true);
@@ -107,12 +109,12 @@ export default function StrategyPage() {
       if (data.exists) {
         setForm(f => ({ ...f, symbols: [...f.symbols, c] }));
         setCoinInput('');
-        show(`✅ ${c} əlavə edildi`, 'success');
+        show(`✅ ${c} ${t('coinAdded')}`, 'success');
       } else {
-        show(`❌ ${c} ${form.exchange}-də mövcud deyil`, 'error');
+        show(`❌ ${c} ${t('coinNotFound')}`, 'error');
       }
     } catch {
-      show('Yoxlama xətası', 'error');
+      show(t('validationError'), 'error');
     } finally {
       setValidating(false);
     }
@@ -123,8 +125,8 @@ export default function StrategyPage() {
   }
 
   async function save() {
-    if (!form.name) return show('Strategiya adı daxil edin', 'error');
-    if (!form.symbols.length) return show('Ən azı 1 coin əlavə edin', 'error');
+    if (!form.name) return show(t('strategyNameRequired'), 'error');
+    if (!form.symbols.length) return show(t('addAtLeastOneCoin'), 'error');
     setSaving(true);
     try {
       const payload = {
@@ -140,8 +142,9 @@ export default function StrategyPage() {
           max_open_trades: form.maxOpen,
           timeframe: form.timeframe,
           exchange: form.exchange,
-          entry_conditions: form.noConditions ? [] : form.conditions,
+          entry_conditions: (form.noConditions || form.webhookMode) ? [] : form.conditions,
           no_conditions: form.noConditions,
+          webhook_mode: form.webhookMode,
           trailing_sl: form.trailingSl ? +form.trailingSl : null,
           paper_mode: form.paperMode,
           dca_enabled: form.dcaEnabled,
@@ -151,10 +154,10 @@ export default function StrategyPage() {
       };
       if (editId !== null) {
         await api.put(`/api/strategies/${editId}`, payload);
-        show('✅ Strategiya yeniləndi', 'success');
+        show(`✅ ${t('strategyUpdated')}`, 'success');
       } else {
         await api.post('/api/strategies', payload);
-        show('✅ Strategiya yaradıldı', 'success');
+        show(`✅ ${t('strategySaved')}`, 'success');
       }
       resetForm();
       load();
@@ -302,18 +305,32 @@ export default function StrategyPage() {
 
           {/* ── Entry Conditions ── */}
           <div>
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex flex-wrap items-center gap-3 mb-3">
               <label className="label mb-0">{t('entryConditions')}</label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.noConditions}
-                  onChange={e => setForm(f => ({ ...f, noConditions: e.target.checked }))} />
-                <span style={{ color: form.noConditions ? 'var(--accent)' : 'var(--text-muted)' }}>
-                  {t('noConditionMode')}
+                <input type="checkbox" checked={form.webhookMode}
+                  onChange={e => setForm(f => ({ ...f, webhookMode: e.target.checked, noConditions: false }))} />
+                <span style={{ color: form.webhookMode ? '#a78bfa' : 'var(--text-muted)' }}>
+                  📡 {t('webhookMode')}
                 </span>
               </label>
+              {!form.webhookMode && (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={form.noConditions}
+                    onChange={e => setForm(f => ({ ...f, noConditions: e.target.checked }))} />
+                  <span style={{ color: form.noConditions ? 'var(--accent)' : 'var(--text-muted)' }}>
+                    {t('noConditionMode')}
+                  </span>
+                </label>
+              )}
             </div>
 
-            {form.noConditions ? (
+            {form.webhookMode ? (
+              <div className="p-4 rounded-lg space-y-2" style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.4)' }}>
+                <p className="text-sm font-semibold" style={{ color: '#a78bfa' }}>📡 {t('webhookMode')}</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('webhookModeHint')}</p>
+              </div>
+            ) : form.noConditions ? (
               <div className="p-3 rounded-lg text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--accent)', color: 'var(--accent)' }}>
                 {t('noConditionWarning')}
               </div>
@@ -463,7 +480,7 @@ export default function StrategyPage() {
                         <button onClick={async () => {
                           try {
                             await api.post(`/api/strategies/marketplace/${s.id}/copy`);
-                            show(`✅ ${s.name} kopyalandı`, 'success');
+                            show(`✅ ${s.name} — ${t('strategyCopied')}`, 'success');
                             load();
                           } catch (e: any) { show(e.response?.data?.detail || t('error'), 'error'); }
                         }} className="btn btn-secondary text-sm">
@@ -516,7 +533,9 @@ export default function StrategyPage() {
                         </div>
                         <div className="flex flex-wrap gap-2 items-center">
                           <span>
-                            {s.config.entry_conditions?.length
+                            {s.config.webhook_mode
+                              ? `📡 ${t('webhookLabel')}`
+                              : s.config.entry_conditions?.length
                               ? `${s.config.entry_conditions.length} ${t('conditionsSuffix')}`
                               : t('noConditionLabel')}
                           </span>

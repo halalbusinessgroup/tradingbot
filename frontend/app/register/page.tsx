@@ -1,10 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, LANGS } from '@/lib/i18n';
+import { useTheme } from '@/lib/theme';
 
 export default function RegisterPage() {
-  const { t } = useI18n();
+  const { t, lang, setLang } = useI18n();
+  const { theme, toggle } = useTheme();
   const [form, setForm] = useState({
     firstName: '', lastName: '', phone: '', address: '', email: '', password: '',
   });
@@ -41,10 +43,49 @@ export default function RegisterPage() {
     }
   }
 
+  // ── Top bar ──────────────────────────────────────────────
+  const TopBar = () => (
+    <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
+      <button
+        onClick={toggle}
+        className="px-3 py-1.5 rounded-lg text-xs font-medium"
+        style={{
+          background: 'var(--panel)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+        }}
+        title={theme === 'dark' ? t('lightMode') : t('darkMode')}
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
+
+      <div className="flex items-center gap-1 px-2 py-1 rounded-lg"
+        style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
+        {LANGS.map(l => (
+          <button
+            key={l.code}
+            onClick={() => setLang(l.code)}
+            className="px-1.5 py-0.5 rounded text-xs font-bold transition-colors"
+            style={{
+              background: lang === l.code ? 'var(--accent)' : 'transparent',
+              color: lang === l.code ? '#000' : 'var(--text-muted)',
+              cursor: 'pointer',
+              border: 'none',
+            }}
+          >
+            {l.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   // Pending approval screen shown after registration
   if (pending) {
     return (
       <div className="min-h-screen flex items-center justify-center">
+        <TopBar />
         <div className="card w-full max-w-md space-y-5 text-center">
           <div className="text-6xl">⏳</div>
           <h1 className="text-xl font-bold">{t('pendingApprovalTitle')}</h1>
@@ -65,8 +106,12 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center py-10">
+      <TopBar />
       <form onSubmit={submit} className="card w-full max-w-md space-y-4">
-        <h1 className="text-2xl font-bold">{t('register')}</h1>
+        <div className="text-center space-y-1">
+          <div className="text-3xl">⚡</div>
+          <h1 className="text-2xl font-bold">{t('register')}</h1>
+        </div>
         {err && <p style={{ color: 'var(--danger)' }} className="text-sm">{err}</p>}
 
         <div className="grid grid-cols-2 gap-3">

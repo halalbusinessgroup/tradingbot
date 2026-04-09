@@ -182,7 +182,7 @@ export default function AdminPage() {
           <div className="card">
             <h2 className="font-bold mb-4">⏳ {t('pendingApproval')}</h2>
             {pending.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)' }}>Təsdiq gözləyən istifadəçi yoxdur.</p>
+              <p style={{ color: 'var(--text-muted)' }}>{t('noPendingUsers')}</p>
             ) : (
               <div className="space-y-3">
                 {pending.map(u => (
