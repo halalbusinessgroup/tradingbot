@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Dark theme (default) ── */
+:root {
+  --bg: #0b0e14;
+  --panel: #11151d;
+  --border: #1f2733;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #22c55e;
+  --danger: #ef4444;
+  --input-bg: #0b0e14;
+}
+
+/* ── Light theme ── */
+html.light {
+  --bg: #f0f4f8;
+  --panel: #ffffff;
+  --border: #d1d9e0;
+  --text: #1a202c;
+  --text-muted: #4a5568;
+  --accent: #16a34a;
+  --danger: #dc2626;
+  --input-bg: #f7fafc;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system;
+  transition: background 0.2s, color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile base improvements */
+* { box-sizing: border-box; }
+input, select, textarea, button { font-size: 16px; } /* prevent iOS zoom */
+
+@media (max-width: 640px) {
+  .card { padding: 14px; border-radius: 10px; }
+  h1 { font-size: 1.3rem !important; }
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  transition: background 0.2s, border 0.2s;
+}
+
+.btn { @apply px-4 py-2 rounded-lg font-medium transition cursor-pointer; }
+.btn-primary { background: var(--accent); color: #000; }
+.btn-primary:hover { opacity: 0.85; }
+.btn-secondary { background: var(--panel); border: 1px solid var(--border); color: var(--text); }
+.btn-secondary:hover { border-color: var(--accent); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { opacity: 0.85; }
+
+.input {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  outline: none;
+  transition: border 0.15s;
+}
+.input:focus { border-color: var(--accent); }
+
+.label { font-size: 0.875rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
+
+table { width: 100%; font-size: 0.875rem; }
+th { text-align: left; color: var(--text-muted); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+
+.text-accent { color: var(--accent); }
+.text-danger { color: var(--danger); }
+.text-muted { color: var(--text-muted); }
+.bg-panel { background: var(--panel); }
+.bg-bg { background: var(--bg); }
+.border-border { border-color: var(--border); }
