@@ -5,6 +5,98 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useToast } from '@/lib/toast';
 
+// ── Deactivate Confirmation Modal ────────────────────────────────────────────
+function DeactivateModal({
+  strategyName,
+  onSellToUsdt,
+  onKeepCoins,
+  onCancel,
+  loading,
+}: {
+  strategyName: string;
+  onSellToUsdt: () => void;
+  onKeepCoins: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="card" style={{ maxWidth: 420, width: '100%', space: 0 }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-lg">⏸ {t('deactivateModalTitle')}</h3>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 20 }}>×</button>
+        </div>
+
+        {/* Strategy name badge */}
+        <div className="px-3 py-2 rounded-lg mb-4 text-sm font-semibold"
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+          📊 {strategyName}
+        </div>
+
+        {/* Message */}
+        <p className="text-sm mb-5" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          {t('deactivateModalMsg')}
+        </p>
+
+        {/* Buttons */}
+        <div className="space-y-3">
+          {/* Sell to USDT */}
+          <button
+            onClick={onSellToUsdt}
+            disabled={loading}
+            className="w-full py-3 rounded-xl font-semibold text-sm flex flex-col items-center gap-1 transition-all"
+            style={{
+              background: loading ? 'rgba(249,115,22,0.1)' : 'rgba(249,115,22,0.15)',
+              border: '2px solid #f97316',
+              color: '#f97316',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}>
+            <span>{loading ? '⏳ ...' : t('sellToUsdt')}</span>
+            <span style={{ fontSize: 11, fontWeight: 400, color: 'rgba(249,115,22,0.7)' }}>
+              {t('sellToUsdtHint')}
+            </span>
+          </button>
+
+          {/* Keep coins */}
+          <button
+            onClick={onKeepCoins}
+            disabled={loading}
+            className="w-full py-3 rounded-xl font-semibold text-sm flex flex-col items-center gap-1 transition-all"
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              color: 'var(--text)',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}>
+            <span>{t('keepCoins')}</span>
+            <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>
+              {t('keepCoinsHint')}
+            </span>
+          </button>
+
+          {/* Cancel */}
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            style={{ background: 'none', border: 'none', width: '100%', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, padding: '8px 0' }}>
+            {t('cancelDeactivate')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TIMEFRAMES = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w'];
 const ORDER_TYPES = ['market', 'limit', 'stop_market', 'stop_limit'] as const;
 
@@ -62,6 +154,10 @@ export default function StrategyPage() {
   const [validating, setValidating] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Deactivate modal
+  const [deactivateTarget, setDeactivateTarget] = useState<any | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   async function load() {
     const { data } = await api.get('/api/strategies');
@@ -174,18 +270,48 @@ export default function StrategyPage() {
   }
 
   async function toggleActive(s: any) {
-    // If deactivating and auto_convert is on → ask for confirmation
-    if (s.is_active && s.config?.auto_convert) {
-      if (!confirm(t('confirmDeactivate'))) return;
-      try {
-        await api.post(`/api/strategies/${s.id}/deactivate`);
-        show(`✅ ${t('strategySaved')}`, 'success');
-        load();
-        return;
-      } catch (e: any) { show(e.response?.data?.detail || t('error'), 'error'); return; }
+    if (s.is_active) {
+      // Deactivating → show modal to ask sell/keep
+      setDeactivateTarget(s);
+      return;
     }
-    await api.put(`/api/strategies/${s.id}`, { name: s.name, is_active: !s.is_active, config: s.config });
+    // Activating → just toggle
+    await api.put(`/api/strategies/${s.id}`, { name: s.name, is_active: true, config: s.config });
     load();
+  }
+
+  async function handleDeactivateSell() {
+    if (!deactivateTarget) return;
+    setDeactivating(true);
+    try {
+      await api.post(`/api/strategies/${deactivateTarget.id}/deactivate`);
+      show(`✅ ${t('sellToUsdt')} — ${t('strategyUpdated')}`, 'success');
+      setDeactivateTarget(null);
+      load();
+    } catch (e: any) {
+      show(e.response?.data?.detail || t('error'), 'error');
+    } finally {
+      setDeactivating(false);
+    }
+  }
+
+  async function handleDeactivateKeep() {
+    if (!deactivateTarget) return;
+    setDeactivating(true);
+    try {
+      await api.put(`/api/strategies/${deactivateTarget.id}`, {
+        name: deactivateTarget.name,
+        is_active: false,
+        config: deactivateTarget.config,
+      });
+      show(`⏸ ${t('strategyUpdated')}`, 'success');
+      setDeactivateTarget(null);
+      load();
+    } catch (e: any) {
+      show(e.response?.data?.detail || t('error'), 'error');
+    } finally {
+      setDeactivating(false);
+    }
   }
 
   async function del(id: number) {
@@ -208,6 +334,18 @@ export default function StrategyPage() {
   return (
     <div>
       <Nav />
+
+      {/* Deactivate confirmation modal */}
+      {deactivateTarget && (
+        <DeactivateModal
+          strategyName={deactivateTarget.name}
+          onSellToUsdt={handleDeactivateSell}
+          onKeepCoins={handleDeactivateKeep}
+          onCancel={() => setDeactivateTarget(null)}
+          loading={deactivating}
+        />
+      )}
+
       <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
         <h1 className="text-2xl font-bold">{t('strategyMgmt')}</h1>
 
@@ -471,18 +609,6 @@ export default function StrategyPage() {
             {showAdvanced && (
               <div className="mt-3 space-y-4 p-3 rounded-lg" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
 
-                {/* Auto-convert */}
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={form.autoConvert}
-                    onChange={e => setForm(f => ({ ...f, autoConvert: e.target.checked }))} />
-                  <span style={{ color: form.autoConvert ? '#f59e0b' : 'var(--text-muted)' }}>
-                    🔄 {t('autoConvertOnStop')}
-                  </span>
-                </label>
-                {form.autoConvert && (
-                  <p className="text-xs ml-5" style={{ color: '#f59e0b' }}>⚠️ {t('autoConvertHint')}</p>
-                )}
-
                 {/* Paper Trading */}
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={form.paperMode}
@@ -675,9 +801,6 @@ export default function StrategyPage() {
                           )}
                           {s.config.dca_enabled && (
                             <span className="px-1.5 py-0.5 rounded text-xs" style={{ background: '#1a1a2a', color: '#a78bfa' }}>📉 DCA</span>
-                          )}
-                          {s.config.auto_convert && (
-                            <span className="px-1.5 py-0.5 rounded text-xs" style={{ background: '#2a1a00', color: '#fb923c' }}>🔄 AutoSell</span>
                           )}
                           {s.is_public && (
                             <span className="px-1.5 py-0.5 rounded text-xs" style={{ background: '#2a1a00', color: '#fbbf24' }}>🏪 Public</span>
