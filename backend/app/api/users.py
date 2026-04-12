@@ -2,6 +2,7 @@ import secrets
 import logging
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
@@ -10,7 +11,7 @@ from app.schemas.schemas import ApiKeyIn, ApiKeyOut, BotToggle, ProfileUpdate, E
 from app.core.security import encrypt_str, decrypt_str
 from app.core.deps import get_current_user
 from app.services.exchange_service import ExchangeService, make_public_client
-from app.services.email_service import generate_code, send_verification_email
+from app.services.email_service import generate_code, send_verification_email, send_feedback_to_admin
 from app.config import settings
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -229,6 +230,27 @@ def update_profile(payload: ProfileUpdate, db: Session = Depends(get_db), user: 
     db.refresh(user)
     return {"ok": True, "first_name": user.first_name, "last_name": user.last_name,
             "phone": user.phone, "address": user.address}
+
+
+# ---------- Feedback (bug report / feature request) ----------
+
+class FeedbackIn(BaseModel):
+    feedback_type: str  # "bug" | "feature"
+    message: str
+
+
+@router.post("/feedback")
+def submit_feedback(payload: FeedbackIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    if not payload.message or len(payload.message.strip()) < 10:
+        raise HTTPException(400, "Message too short (min 10 characters)")
+    if payload.feedback_type not in ("bug", "feature"):
+        raise HTTPException(400, "Invalid feedback type")
+    # Send to admin email
+    admin_email = settings.ADMIN_EMAIL
+    if admin_email:
+        send_feedback_to_admin(admin_email, user.email, payload.feedback_type, payload.message.strip())
+    log.info(f"Feedback from {user.email}: [{payload.feedback_type}] {payload.message[:80]}")
+    return {"ok": True}
 
 
 # ---------- Email change ----------

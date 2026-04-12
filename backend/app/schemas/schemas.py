@@ -86,19 +86,30 @@ class ApiKeyOut(BaseModel):
 class StrategyConfig(BaseModel):
     symbols: List[str]
     amount_usdt: float = Field(gt=0)
-    tp_percent: float = Field(gt=0, le=100)
-    sl_percent: float = Field(gt=0, le=100)
+    tp_percent: Optional[float] = None        # percent mode TP
+    sl_percent: Optional[float] = None        # percent mode SL
+    # TP/SL mode: 'percent' (default) | 'price'
+    tp_sl_mode: str = "percent"
+    tp_price: Optional[float] = None          # price mode TP (absolute USDT price)
+    sl_price: Optional[float] = None          # price mode SL (absolute USDT price)
     max_open_trades: int = Field(ge=1, le=20)
     entry_conditions: List[dict] = []
     timeframe: str = "15m"
     exchange: str = "binance"
+    # Order type: market | limit | stop_market | stop_limit
+    order_type: str = "market"
+    limit_price: Optional[float] = None       # for limit/stop_limit orders
+    stop_trigger_price: Optional[float] = None  # for stop_market/stop_limit orders
     # Advanced options
-    trailing_sl: Optional[float] = None      # e.g. 1.5 = 1.5% trailing stop
-    paper_mode: bool = False                  # simulate trades without real orders
-    dca_enabled: bool = False                 # Dollar Cost Averaging
-    dca_percent: float = 2.0                  # DCA trigger: price drops this % below entry
-    dca_amount: float = 10.0                  # USDT to add on DCA
-    no_conditions: bool = False               # Buy every cycle (no indicator check)
+    trailing_sl: Optional[float] = None       # e.g. 1.5 = 1.5% trailing stop
+    trailing_tp: Optional[float] = None       # trailing take profit %
+    trailing_tp_activation: Optional[float] = 3.0  # activate trailing TP at this profit %
+    paper_mode: bool = False                   # simulate trades without real orders
+    dca_enabled: bool = False                  # Dollar Cost Averaging
+    dca_percent: float = 2.0                   # DCA trigger: price drops this % below entry
+    dca_amount: float = 10.0                   # USDT to add on DCA
+    no_conditions: bool = False                # Buy every cycle (no indicator check)
+    auto_convert: bool = False                 # Market sell all coins to USDT on deactivation
 
 
 class StrategyIn(BaseModel):

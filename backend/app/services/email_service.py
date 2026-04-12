@@ -153,6 +153,32 @@ def send_trade_closed(user_email: str, symbol: str, exit_price: float,
     return _send(user_email, f"⚡ TradingBot — {symbol} {reason_str}", body)
 
 
+def send_feedback_to_admin(admin_email: str, user_email: str, feedback_type: str, message: str) -> bool:
+    """Send user feedback (bug report / feature request) to admin."""
+    icon = "🐛" if feedback_type == "bug" else "💡"
+    type_label = "Bug Report" if feedback_type == "bug" else "Feature Request"
+    body = _template(
+        f"{icon} {type_label}",
+        f"""
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <tr>
+            <td style="color:#888;padding:6px 0">From</td>
+            <td style="font-weight:bold;color:#e6edf3">{user_email}</td>
+          </tr>
+          <tr>
+            <td style="color:#888;padding:6px 0">Type</td>
+            <td style="color:#f59e0b;font-weight:bold">{type_label}</td>
+          </tr>
+        </table>
+        <div style="background:#0b1a0f;border:1px solid #22c55e;border-radius:8px;
+                    padding:16px;margin:16px 0;font-size:14px;color:#e6edf3;white-space:pre-wrap">
+          {message}
+        </div>
+        """
+    )
+    return _send(admin_email, f"⚡ TradingBot — {icon} {type_label} from {user_email}", body)
+
+
 def send_bot_error(user_email: str, error_msg: str, symbol: str = "") -> bool:
     body = _template(
         "⚠️ Bot Xətası",

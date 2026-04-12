@@ -160,9 +160,11 @@ def _execute_buy(
     db: Session, user: User, svc, strat: Strategy,
     symbol: str, cfg: dict, paper_mode: bool
 ):
-    amount = float(cfg["amount_usdt"])
-    tp_pct = float(cfg["tp_percent"])
-    sl_pct = float(cfg["sl_percent"])
+    amount       = float(cfg["amount_usdt"])
+    tp_sl_mode   = cfg.get("tp_sl_mode", "percent")
+    tp_pct       = float(cfg.get("tp_percent") or 3)
+    sl_pct       = float(cfg.get("sl_percent") or 1.5)
+    order_type   = cfg.get("order_type", "market")
     trailing_sl_pct = cfg.get("trailing_sl")
 
     qty = entry = order_id = None
@@ -175,12 +177,46 @@ def _execute_buy(
             _log(db, user.id, "INFO",
                  f"📄 PAPER BUY {symbol} qty={qty:.6f} @ {entry:.4f}")
         else:
-            result = svc.market_buy_quote(symbol, amount)
+            if order_type == "market":
+                result = svc.market_buy_quote(symbol, amount)
+            elif order_type == "limit":
+                limit_px = float(cfg.get("limit_price") or svc.get_price(symbol))
+                qty_to_buy = amount / limit_px
+                from app.services.exchange_service import to_ccxt_symbol
+                ccxt_sym = to_ccxt_symbol(symbol)
+                qty_safe = svc._safe_amount(ccxt_sym, qty_to_buy)
+                price_safe = svc._safe_price(ccxt_sym, limit_px)
+                raw = svc.client.create_order(ccxt_sym, "limit", "buy", qty_safe, price_safe, {"timeInForce": "GTC"})
+                result = {"qty": qty_safe, "entry_price": price_safe, "order_id": str(raw["id"])}
+            elif order_type == "stop_market":
+                stop_px = float(cfg.get("stop_trigger_price") or svc.get_price(symbol))
+                qty_to_buy = amount / stop_px
+                from app.services.exchange_service import to_ccxt_symbol
+                ccxt_sym = to_ccxt_symbol(symbol)
+                qty_safe = svc._safe_amount(ccxt_sym, qty_to_buy)
+                stop_safe = svc._safe_price(ccxt_sym, stop_px)
+                raw = svc.client.create_order(ccxt_sym, "stop_loss", "buy", qty_safe, stop_safe, {"stopPrice": stop_safe})
+                result = {"qty": qty_safe, "entry_price": stop_safe, "order_id": str(raw["id"])}
+            elif order_type == "stop_limit":
+                stop_px = float(cfg.get("stop_trigger_price") or svc.get_price(symbol))
+                limit_px = float(cfg.get("limit_price") or stop_px)
+                qty_to_buy = amount / limit_px
+                from app.services.exchange_service import to_ccxt_symbol
+                ccxt_sym = to_ccxt_symbol(symbol)
+                qty_safe = svc._safe_amount(ccxt_sym, qty_to_buy)
+                limit_safe = svc._safe_price(ccxt_sym, limit_px)
+                stop_safe = svc._safe_price(ccxt_sym, stop_px)
+                raw = svc.client.create_order(ccxt_sym, "stop_loss_limit", "buy", qty_safe, limit_safe,
+                                              {"stopPrice": stop_safe, "timeInForce": "GTC"})
+                result = {"qty": qty_safe, "entry_price": limit_safe, "order_id": str(raw["id"])}
+            else:
+                result = svc.market_buy_quote(symbol, amount)
+
             qty = result["qty"]
             entry = result["entry_price"]
             order_id = result.get("order_id")
             _log(db, user.id, "INFO",
-                 f"✅ BUY {symbol} qty={qty:.6f} @ {entry:.4f} | order_id={order_id}")
+                 f"✅ BUY [{order_type}] {symbol} qty={qty:.6f} @ {entry:.4f} | order_id={order_id}")
     except Exception as e:
         _log(db, user.id, "ERROR", f"BUY xəta {symbol}: {e}")
         tg.send_message(user.telegram_chat_id, tg.msg_error(f"BUY xəta {symbol}: {e}"))
@@ -188,8 +224,13 @@ def _execute_buy(
             send_bot_error(user.email, f"BUY xəta {symbol}: {e}", symbol)
         return
 
-    tp_price = entry * (1 + tp_pct / 100)
-    sl_price = entry * (1 - sl_pct / 100)
+    # Calculate TP/SL based on mode
+    if tp_sl_mode == "price":
+        tp_price = float(cfg.get("tp_price") or entry * 1.03)
+        sl_price = float(cfg.get("sl_price") or entry * 0.985)
+    else:
+        tp_price = entry * (1 + tp_pct / 100)
+        sl_price = entry * (1 - sl_pct / 100)
 
     tp_id = sl_id = None
     if not paper_mode:
@@ -379,7 +420,43 @@ def _check_single_trade(db: Session, user: User, svc, trade: Trade, cfg: dict):
             _close_trade(db, user, svc, trade, exit_price, reason)
             return
 
-    # ── 5. Trailing Stop Loss ─────────────────────────────────────────────────
+    # ── 5. Trailing Take Profit ───────────────────────────────────────────────
+    trailing_tp_pct = cfg.get("trailing_tp")
+    trailing_tp_activation = float(cfg.get("trailing_tp_activation") or 3.0)
+
+    if trailing_tp_pct and not closed and trade.entry_price:
+        trailing_tp_pct = float(trailing_tp_pct)
+        profit_pct = ((current - trade.entry_price) / trade.entry_price) * 100
+
+        # Only activate when trade is sufficiently profitable
+        if profit_pct >= trailing_tp_activation:
+            # The trailing TP is a trailing stop from current price
+            trailing_tp_sl = current * (1 - trailing_tp_pct / 100)
+
+            # Use tp_price field to track the trailing TP high-water mark
+            if trade.tp_price is None or trailing_tp_sl > trade.tp_price:
+                old_tp = trade.tp_price
+                trade.tp_price = trailing_tp_sl
+                _log(db, trade.user_id, "INFO",
+                     f"🎯 Trailing TP {trade.symbol}: {old_tp:.4f if old_tp else 'N/A'} → {trailing_tp_sl:.4f} (cur={current:.4f}, profit={profit_pct:.2f}%)")
+                db.commit()
+            elif current <= trade.tp_price:
+                # Price fell below trailing TP level — lock in profit
+                _log(db, trade.user_id, "INFO",
+                     f"🎯 Trailing TP triggered {trade.symbol} @ {current:.4f}")
+                if not trade.paper_trade:
+                    try:
+                        sell_result = svc.market_sell(trade.symbol, trade.qty)
+                        exit_price = float(sell_result.get("average") or sell_result.get("price") or current)
+                    except Exception as e:
+                        _log(db, trade.user_id, "ERROR", f"Trailing TP sell failed {trade.symbol}: {e}")
+                        exit_price = current
+                else:
+                    exit_price = current
+                _close_trade(db, user, svc, trade, exit_price, "TP")
+                return
+
+    # ── 6. Trailing Stop Loss ─────────────────────────────────────────────────
     if trade.trailing_sl and not closed:
         trailing_pct = float(trade.trailing_sl)
         new_sl = current * (1 - trailing_pct / 100)
@@ -411,7 +488,7 @@ def _check_single_trade(db: Session, user: User, svc, trade: Trade, cfg: dict):
                     log.warning(f"Trailing SL order güncəllənə bilmədi {trade.symbol}: {e}")
             db.commit()
 
-    # ── 6. DCA (Dollar Cost Averaging) ───────────────────────────────────────
+    # ── 7. DCA (Dollar Cost Averaging) ───────────────────────────────────────
     if not closed and cfg.get("dca_enabled") and not trade.paper_trade:
         dca_pct = float(cfg.get("dca_percent", 2.0))
         dca_amount = float(cfg.get("dca_amount", 10.0))

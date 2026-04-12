@@ -11,6 +11,8 @@ const NAV_LINKS = [
   { href: '/trades',    key: 'trades' },
   { href: '/backtest',  key: 'backtest' },
   { href: '/markets',   key: 'markets' },
+  { href: '/guide',     key: 'guide' },
+  { href: '/feedback',  key: 'feedback' },
   { href: '/settings',  key: 'settings' },
 ];
 
