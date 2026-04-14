@@ -1017,6 +1017,97 @@ def _detect_premium_discount(highs: List[float], lows: List[float], closes: List
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  SMC SHORT-NAME ALIASES
+#  (Generic / direction-neutral versions used in simple condition builder)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _detect_bos_any(highs: List[float], lows: List[float], closes: List[float],
+                    lookback: int = 30) -> bool:
+    """BOS (any direction): True if a bullish OR bearish BOS is detected."""
+    result = _detect_bos(highs, lows, closes, lookback)
+    if result is None:
+        return False
+    return result.get("bullish_bos", False) or result.get("bearish_bos", False)
+
+
+def _detect_mbos(highs: List[float], lows: List[float], closes: List[float],
+                 lookback: int = 20) -> dict:
+    """MBOS — Minor / Internal Break of Structure.
+    Uses tighter pivot parameters (left=2, right=1) to detect smaller-scale
+    structure breaks inside a larger swing. Returns bullish_mbos / bearish_mbos.
+    """
+    if len(closes) < lookback:
+        return {"bullish_mbos": False, "bearish_mbos": False}
+    h = highs[-lookback:]
+    l = lows[-lookback:]
+
+    ph = _find_pivot_highs(h, left=2, right=1)
+    pl = _find_pivot_lows(l, left=2, right=1)
+
+    if not ph or not pl:
+        return {"bullish_mbos": False, "bearish_mbos": False}
+
+    last_resistance = ph[-1][1]
+    last_support = pl[-1][1]
+    current = closes[-1]
+
+    return {
+        "bullish_mbos": current > last_resistance,
+        "bearish_mbos": current < last_support,
+        "resistance": round(last_resistance, 8),
+        "support": round(last_support, 8),
+    }
+
+
+def _detect_ob_any(opens: List[float], highs: List[float], lows: List[float],
+                   closes: List[float], lookback: int = 20) -> bool:
+    """OB (any direction): True if a bullish OR bearish Order Block is detected."""
+    result = _detect_order_block(opens, highs, lows, closes, lookback)
+    if result is None:
+        return False
+    return result.get("bullish_ob", False) or result.get("bearish_ob", False)
+
+
+def _detect_choch_any(highs: List[float], lows: List[float], closes: List[float],
+                      lookback: int = 50) -> bool:
+    """CHOCH (any direction): True if a bullish OR bearish CHoCH is detected."""
+    result = _detect_choch(highs, lows, closes, lookback)
+    if result is None:
+        return False
+    return result.get("bullish_choch", False) or result.get("bearish_choch", False)
+
+
+def _detect_fvg_50(highs: List[float], lows: List[float], closes: List[float]) -> dict:
+    """FVG 50% — Fair Value Gap where price has retraced to fill 50% of the gap.
+    A bullish FVG 50% means: gap exists and current price is at or below the 50% level.
+    A bearish FVG 50% means: gap exists and current price is at or above the 50% level.
+    Useful for entries at the 'equilibrium' of an FVG zone.
+    """
+    fvg = _detect_fvg(highs, lows)
+    if fvg is None or (fvg["fvg_high"] is None and fvg["fvg_low"] is None):
+        return {"bullish_fvg_50": False, "bearish_fvg_50": False}
+
+    price = closes[-1]
+    bullish_fvg_50 = False
+    bearish_fvg_50 = False
+
+    if fvg.get("bullish_fvg") and fvg["fvg_high"] is not None and fvg["fvg_low"] is not None:
+        midpoint = (fvg["fvg_high"] + fvg["fvg_low"]) / 2
+        # Price has entered the gap and reached the 50% level (≤ midpoint)
+        bullish_fvg_50 = fvg["fvg_low"] <= price <= midpoint
+
+    if fvg.get("bearish_fvg") and fvg["fvg_high"] is not None and fvg["fvg_low"] is not None:
+        midpoint = (fvg["fvg_high"] + fvg["fvg_low"]) / 2
+        # Price has entered the bearish gap and reached the 50% level (≥ midpoint)
+        bearish_fvg_50 = midpoint <= price <= fvg["fvg_high"]
+
+    return {
+        "bullish_fvg_50": bullish_fvg_50,
+        "bearish_fvg_50": bearish_fvg_50,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  CANDLESTICK PATTERNS
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1298,8 +1389,12 @@ def evaluate_condition(ohlcv: List[list], cond: dict) -> bool:
     TREND_SHIFT_BULLISH, TREND_SHIFT_BEARISH
 
     ─── SMC ─────────────────
-    BULLISH_BOS, BEARISH_BOS, BULLISH_CHOCH, BEARISH_CHOCH
-    BULLISH_FVG, BEARISH_FVG, BULLISH_OB, BEARISH_OB
+    BULLISH_BOS, BEARISH_BOS, BOS (any direction)
+    MBOS / MINOR_BOS, BULLISH_MBOS, BEARISH_MBOS
+    BULLISH_CHOCH, BEARISH_CHOCH, CHOCH (any direction)
+    BULLISH_FVG, BEARISH_FVG
+    FVG_50 / FVG50, BULLISH_FVG_50, BEARISH_FVG_50
+    BULLISH_OB, BEARISH_OB, OB (any direction)
     EQUAL_HIGHS, EQUAL_LOWS, BULLISH_SWEEP, BEARISH_SWEEP
     IN_PREMIUM, IN_DISCOUNT
 
@@ -1629,6 +1724,44 @@ def evaluate_condition(ohlcv: List[list], cond: dict) -> bool:
     if name in ("IN_PREMIUM", "IN_DISCOUNT"):
         pd = _detect_premium_discount(highs, lows, closes, lookback=max(period, 30))
         return pd.get("in_premium" if name == "IN_PREMIUM" else "in_discount", False)
+
+    # ── SMC short-name aliases ────────────────────────────────────────────────
+    if name == "BOS":
+        return _detect_bos_any(highs, lows, closes, lookback=max(period, 20))
+
+    if name == "BULLISH_BOS_ONLY":  # alias kept for clarity
+        bos = _detect_bos(highs, lows, closes, lookback=max(period, 20))
+        return bos.get("bullish_bos", False) if bos else False
+
+    if name in ("MBOS", "MINOR_BOS"):
+        mbos = _detect_mbos(highs, lows, closes, lookback=max(period, 20))
+        return mbos.get("bullish_mbos", False) or mbos.get("bearish_mbos", False)
+
+    if name == "BULLISH_MBOS":
+        mbos = _detect_mbos(highs, lows, closes, lookback=max(period, 20))
+        return mbos.get("bullish_mbos", False)
+
+    if name == "BEARISH_MBOS":
+        mbos = _detect_mbos(highs, lows, closes, lookback=max(period, 20))
+        return mbos.get("bearish_mbos", False)
+
+    if name == "OB":
+        return _detect_ob_any(opens, highs, lows, closes, lookback=max(period, 20))
+
+    if name == "CHOCH":
+        return _detect_choch_any(highs, lows, closes, lookback=max(period, 30))
+
+    if name in ("FVG_50", "FVG50"):
+        result = _detect_fvg_50(highs, lows, closes)
+        return result.get("bullish_fvg_50", False) or result.get("bearish_fvg_50", False)
+
+    if name == "BULLISH_FVG_50":
+        result = _detect_fvg_50(highs, lows, closes)
+        return result.get("bullish_fvg_50", False)
+
+    if name == "BEARISH_FVG_50":
+        result = _detect_fvg_50(highs, lows, closes)
+        return result.get("bearish_fvg_50", False)
 
     # ═══════════════════════════════
     #  FIBONACCI

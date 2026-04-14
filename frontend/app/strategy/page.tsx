@@ -97,6 +97,165 @@ function DeactivateModal({
   );
 }
 
+// ── Searchable Indicator Dropdown ────────────────────────────────────────────
+function IndicatorSearch({
+  value,
+  onChange,
+  groups,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  groups: { label: string; items: string[] }[];
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const q = query.trim().toLowerCase();
+
+  // Filter groups
+  const filtered = q
+    ? groups
+        .map(g => ({
+          label: g.label,
+          items: g.items.filter(ind => ind.toLowerCase().includes(q)),
+        }))
+        .filter(g => g.items.length > 0)
+    : groups;
+
+  const total = filtered.reduce((s, g) => s + g.items.length, 0);
+
+  function select(ind: string) {
+    onChange(ind);
+    setOpen(false);
+    setQuery('');
+  }
+
+  return (
+    <div ref={ref} style={{ position: 'relative', minWidth: 170 }}>
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="input"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 4, cursor: 'pointer', fontSize: 12, padding: '6px 8px',
+          minWidth: 170, textAlign: 'left',
+        }}
+      >
+        <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{value}</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{open ? '▲' : '▼'}</span>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          style={{
+            position: 'absolute', top: '100%', left: 0, zIndex: 9999,
+            background: 'var(--card)', border: '1px solid var(--border)',
+            borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            minWidth: 220, maxWidth: 280,
+            display: 'flex', flexDirection: 'column',
+          }}
+        >
+          {/* Search input */}
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
+            <input
+              autoFocus
+              type="text"
+              className="input"
+              style={{ fontSize: 12, padding: '5px 8px', width: '100%' }}
+              placeholder="🔍 Search indicator..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Results list */}
+          <div style={{ maxHeight: 260, overflowY: 'auto', padding: '4px 0' }}>
+            {total === 0 ? (
+              <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>
+                No results for "{query}"
+              </div>
+            ) : (
+              filtered.map(g => (
+                <div key={g.label}>
+                  {/* Category label */}
+                  <div style={{
+                    padding: '5px 12px 3px',
+                    fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+                    color: 'var(--accent)', textTransform: 'uppercase',
+                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    {g.label}
+                  </div>
+                  {/* Items */}
+                  {g.items.map(ind => (
+                    <button
+                      key={ind}
+                      type="button"
+                      onClick={() => select(ind)}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '5px 16px', fontSize: 12, cursor: 'pointer',
+                        background: ind === value ? 'rgba(34,197,94,0.12)' : 'transparent',
+                        color: ind === value ? '#22c55e' : 'var(--text)',
+                        border: 'none',
+                        fontWeight: ind === value ? 700 : 400,
+                        transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={e => { if (ind !== value) (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                      onMouseLeave={e => { if (ind !== value) (e.target as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      {/* Highlight matching text */}
+                      {q ? (() => {
+                        const idx = ind.toLowerCase().indexOf(q);
+                        if (idx === -1) return ind;
+                        return (
+                          <>
+                            {ind.slice(0, idx)}
+                            <span style={{ background: 'rgba(250,204,21,0.3)', borderRadius: 2 }}>
+                              {ind.slice(idx, idx + q.length)}
+                            </span>
+                            {ind.slice(idx + q.length)}
+                          </>
+                        );
+                      })() : ind}
+                    </button>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Footer hint */}
+          <div style={{
+            padding: '5px 12px', borderTop: '1px solid var(--border)',
+            fontSize: 10, color: 'var(--text-muted)', textAlign: 'center',
+          }}>
+            {total} indicator{total !== 1 ? 's' : ''}
+            {q ? ` matching "${query}"` : ' total'}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TIMEFRAMES = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w'];
 const ORDER_TYPES = ['market', 'limit', 'stop_market', 'stop_limit'] as const;
 
@@ -131,6 +290,11 @@ const INDICATOR_GROUPS = [
     'TREND_SHIFT_BULLISH', 'TREND_SHIFT_BEARISH',
   ]},
   { label: 'SMC', items: [
+    // Short aliases (most used)
+    'BOS', 'MBOS', 'OB', 'CHOCH', 'FVG_50',
+    'BULLISH_FVG_50', 'BEARISH_FVG_50',
+    'BULLISH_MBOS', 'BEARISH_MBOS',
+    // Full directional
     'BULLISH_BOS', 'BEARISH_BOS',
     'BULLISH_CHOCH', 'BEARISH_CHOCH',
     'BULLISH_FVG', 'BEARISH_FVG',
@@ -169,6 +333,8 @@ const BOOLEAN_INDICATORS = new Set([
   'PRICE_ABOVE_BB','PRICE_BELOW_BB','PRICE_ABOVE_KC','PRICE_BELOW_KC',
   'MARKET_STRUCTURE_UPTREND','MARKET_STRUCTURE_DOWNTREND',
   'HH','HL','LH','LL','TREND_SHIFT_BULLISH','TREND_SHIFT_BEARISH',
+  'BOS','MBOS','OB','CHOCH','FVG_50','FVG50',
+  'BULLISH_FVG_50','BEARISH_FVG_50','BULLISH_MBOS','BEARISH_MBOS',
   'BULLISH_BOS','BEARISH_BOS','BULLISH_CHOCH','BEARISH_CHOCH',
   'BULLISH_FVG','BEARISH_FVG','BULLISH_OB','BEARISH_OB',
   'EQUAL_HIGHS','EQUAL_LOWS','BULLISH_SWEEP','BEARISH_SWEEP',
@@ -660,15 +826,12 @@ export default function StrategyPage() {
                   return (
                     <div key={i} className="flex gap-2 mb-2 flex-wrap items-center p-2 rounded-lg"
                       style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                      {/* Indicator select */}
-                      <select className="input" style={{ maxWidth: 170, fontSize: 12 }} value={c.indicator}
-                        onChange={e => updateCondition(i, 'indicator', e.target.value)}>
-                        {INDICATOR_GROUPS.map(g => (
-                          <optgroup key={g.label} label={g.label}>
-                            {g.items.map(ind => <option key={ind} value={ind}>{ind}</option>)}
-                          </optgroup>
-                        ))}
-                      </select>
+                      {/* Searchable indicator picker */}
+                      <IndicatorSearch
+                        value={c.indicator}
+                        onChange={v => updateCondition(i, 'indicator', v)}
+                        groups={INDICATOR_GROUPS}
+                      />
 
                       {/* Period 1 */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
