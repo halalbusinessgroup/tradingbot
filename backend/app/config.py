@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     ENVIRONMENT: str = "development"
 
+    # Anthropic AI Analysis
+    ANTHROPIC_API_KEY: str = ""
+
     # SMTP (email verification)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

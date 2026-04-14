@@ -8,6 +8,7 @@ from app.models.user import User
 from app.core.security import hash_password
 from app.api import auth, users, strategies, trades, admin, backtest
 from app.api import webhook
+from app.api import ai
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("tradingbot")
@@ -35,6 +36,7 @@ app.include_router(trades.router)
 app.include_router(admin.router)
 app.include_router(backtest.router)
 app.include_router(webhook.router)
+app.include_router(ai.router)
 
 
 # ── Auto-migration: safely add missing columns to existing tables ─────────────
