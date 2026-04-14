@@ -30,7 +30,7 @@ function DeactivateModal({
       }}
       onClick={e => { if (e.target === e.currentTarget) onCancel(); }}
     >
-      <div className="card" style={{ maxWidth: 420, width: '100%', space: 0 }}>
+      <div className="card" style={{ maxWidth: 420, width: '100%' }}>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg">⏸ {t('deactivateModalTitle')}</h3>
