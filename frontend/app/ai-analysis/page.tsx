@@ -26,116 +26,161 @@ interface Condition {
   value: number;
 }
 
-// ─── Signal badge helper ─────────────────────────────────────────────────────
+// ─── Signal badge ─────────────────────────────────────────────────────────────
 
-const SIGNAL_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  'STRONG BUY':  { bg: '#064e3b', text: '#34d399', border: '#059669' },
-  'BUY':         { bg: '#052e16', text: '#4ade80', border: '#16a34a' },
-  'NEUTRAL':     { bg: '#1c1917', text: '#a8a29e', border: '#57534e' },
-  'SELL':        { bg: '#450a0a', text: '#f87171', border: '#dc2626' },
-  'STRONG SELL': { bg: '#3b0764', text: '#e879f9', border: '#a21caf' },
+const SIGNALS: Record<string, { bg: string; color: string; border: string }> = {
+  'STRONG BUY':  { bg: '#052e16', color: '#4ade80', border: '#16a34a' },
+  'BUY':         { bg: '#064e3b', color: '#34d399', border: '#059669' },
+  'NEUTRAL':     { bg: '#1c1917', color: '#d6d3d1', border: '#78716c' },
+  'SELL':        { bg: '#450a0a', color: '#f87171', border: '#dc2626' },
+  'STRONG SELL': { bg: '#3b0764', color: '#e879f9', border: '#a21caf' },
 };
 
 function extractSignal(text: string): string | null {
-  const patterns = ['STRONG BUY', 'STRONG SELL', 'BUY', 'SELL', 'NEUTRAL'];
-  for (const p of patterns) {
-    if (text.includes(p)) return p;
+  for (const k of ['STRONG BUY', 'STRONG SELL', 'BUY', 'SELL', 'NEUTRAL']) {
+    if (text.includes(k)) return k;
   }
   return null;
 }
 
-// ─── Simple markdown renderer ─────────────────────────────────────────────────
+// ─── Markdown → React nodes renderer ─────────────────────────────────────────
+// Converts raw markdown text to styled JSX without broken HTML nesting
 
-function renderMarkdown(text: string): string {
-  return text
-    // Code blocks
-    .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="ai-code">$1</pre>')
-    // Bold
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    // Italic
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    // Headers
-    .replace(/^### (.*?)$/gm, '<h3 class="ai-h3">$1</h3>')
-    .replace(/^## (.*?)$/gm, '<h2 class="ai-h2">$1</h2>')
-    .replace(/^# (.*?)$/gm, '<h1 class="ai-h1">$1</h1>')
-    // Horizontal rule
-    .replace(/^---$/gm, '<hr class="ai-hr" />')
-    // Bullet lists
-    .replace(/^[-•] (.*?)$/gm, '<li class="ai-li">$1</li>')
-    // Numbered lists
-    .replace(/^\d+\. (.*?)$/gm, '<li class="ai-li ai-li-num">$1</li>')
-    // Line breaks
-    .replace(/\n\n/g, '</p><p class="ai-p">')
-    .replace(/\n/g, '<br/>');
+function MarkdownLine({ line, idx }: { line: string; idx: number }) {
+  const applyInline = (text: string) => {
+    // Bold: **text**
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((p, i) =>
+      p.startsWith('**') && p.endsWith('**')
+        ? <strong key={i}>{p.slice(2, -2)}</strong>
+        : <span key={i}>{p}</span>
+    );
+  };
+
+  if (line.startsWith('## ')) {
+    return (
+      <div key={idx} style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--accent)', marginTop: '1.2rem', marginBottom: '0.3rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.3rem' }}>
+        {line.slice(3)}
+      </div>
+    );
+  }
+  if (line.startsWith('### ')) {
+    return (
+      <div key={idx} style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '0.8rem', marginBottom: '0.2rem', color: 'var(--fg)' }}>
+        {line.slice(4)}
+      </div>
+    );
+  }
+  if (line.startsWith('━') || line.startsWith('─') || line === '---') {
+    return <hr key={idx} style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0.8rem 0' }} />;
+  }
+  if (line.startsWith('- ') || line.startsWith('• ')) {
+    return (
+      <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginLeft: '0.75rem', marginBottom: '0.15rem', lineHeight: 1.6 }}>
+        <span style={{ color: 'var(--accent)', flexShrink: 0 }}>•</span>
+        <span>{applyInline(line.slice(2))}</span>
+      </div>
+    );
+  }
+  if (/^\d+\. /.test(line)) {
+    const num = line.match(/^(\d+)\. /)?.[1];
+    return (
+      <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginLeft: '0.75rem', marginBottom: '0.15rem', lineHeight: 1.6 }}>
+        <span style={{ color: 'var(--accent)', flexShrink: 0, minWidth: '1.2rem' }}>{num}.</span>
+        <span>{applyInline(line.replace(/^\d+\. /, ''))}</span>
+      </div>
+    );
+  }
+  if (line.trim() === '') {
+    return <div key={idx} style={{ height: '0.4rem' }} />;
+  }
+  return (
+    <div key={idx} style={{ lineHeight: 1.7, marginBottom: '0.1rem' }}>
+      {applyInline(line)}
+    </div>
+  );
 }
 
-// ─── TIMEFRAMES ──────────────────────────────────────────────────────────────
+function MarkdownOutput({ text, streaming }: { text: string; streaming: boolean }) {
+  const lines = text.split('\n');
+  return (
+    <div style={{ fontSize: '0.9rem', color: 'var(--fg)' }}>
+      {lines.map((line, i) => <MarkdownLine key={i} line={line} idx={i} />)}
+      {streaming && (
+        <span style={{ display: 'inline-block', width: 8, height: 16, background: 'var(--accent)', marginLeft: 2, animation: 'blink 1s step-end infinite', verticalAlign: 'middle' }} />
+      )}
+    </div>
+  );
+}
+
+// ─── Timeframes ───────────────────────────────────────────────────────────────
 
 const TIMEFRAMES = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d', '3d', '1w'];
 
-// ─── Main page ───────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AIAnalysisPage() {
   const { t, lang } = useI18n();
 
-  const [enabled, setEnabled]         = useState<boolean | null>(null);
-  const [strategies, setStrategies]   = useState<Strategy[]>([]);
-  const [symbol, setSymbol]           = useState('BTCUSDT');
-  const [exchange, setExchange]       = useState('binance');
-  const [timeframe, setTimeframe]     = useState('1h');
-  const [strategyId, setStrategyId]   = useState<number | null>(null);
-  const [loading, setLoading]         = useState(false);
-  const [streamText, setStreamText]   = useState('');
-  const [signal, setSignal]           = useState<string | null>(null);
-  const [done, setDone]               = useState(false);
+  const [enabled,      setEnabled]      = useState<boolean | null>(null);
+  const [strategies,   setStrategies]   = useState<Strategy[]>([]);
+  const [symbol,       setSymbol]       = useState('BTCUSDT');
+  const [exchange,     setExchange]     = useState('binance');
+  const [timeframe,    setTimeframe]    = useState('1h');
+  const [strategyId,   setStrategyId]   = useState<number | null>(null);
+  const [loading,      setLoading]      = useState(false);
+  const [streamText,   setStreamText]   = useState('');
+  const [signal,       setSignal]       = useState<string | null>(null);
+  const [done,         setDone]         = useState(false);
+  const [error,        setError]        = useState('');
 
-  const abortRef    = useRef<AbortController | null>(null);
-  const outputRef   = useRef<HTMLDivElement>(null);
+  const abortRef  = useRef<AbortController | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Check if AI is enabled on server
+  // Check AI enabled
   useEffect(() => {
     api.get('/api/ai/enabled')
       .then(r => setEnabled(r.data.enabled))
       .catch(() => setEnabled(false));
   }, []);
 
-  // Load user's strategies for the optional dropdown
+  // Load strategies
   useEffect(() => {
     api.get('/api/strategies')
       .then(r => setStrategies(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
   }, []);
 
-  // Auto-scroll to bottom while streaming
+  // Auto-scroll
   useEffect(() => {
-    if (outputRef.current && loading) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
-    }
-  }, [streamText, loading]);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [streamText]);
 
-  // Extract signal when new text arrives
+  // Extract signal
   useEffect(() => {
     if (streamText) {
-      const found = extractSignal(streamText);
-      if (found) setSignal(found);
+      const s = extractSignal(streamText);
+      if (s) setSignal(s);
     }
   }, [streamText]);
 
   const handleAnalyze = useCallback(async () => {
-    if (!symbol.trim()) return;
+    if (!symbol.trim() || loading) return;
 
-    // Cancel any ongoing stream
-    if (abortRef.current) abortRef.current.abort();
+    abortRef.current?.abort();
     abortRef.current = new AbortController();
 
     setLoading(true);
     setStreamText('');
     setSignal(null);
     setDone(false);
+    setError('');
 
-    const selectedStrategy = strategyId
-      ? strategies.find(s => s.id === strategyId) ?? null
-      : null;
+    const sel = strategyId ? strategies.find(s => s.id === strategyId) : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    // Use same base URL as axios instance
+    const baseURL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
     const body: Record<string, unknown> = {
       symbol: symbol.trim().toUpperCase(),
@@ -144,22 +189,21 @@ export default function AIAnalysisPage() {
       lang,
     };
 
-    if (selectedStrategy) {
+    if (sel) {
       body.strategy = {
-        name: selectedStrategy.name,
-        symbols: selectedStrategy.symbols,
-        timeframe: selectedStrategy.timeframe,
-        tp_percent: selectedStrategy.tp_percent,
-        sl_percent: selectedStrategy.sl_percent,
-        amount_usdt: selectedStrategy.amount_usdt,
-        entry_conditions: selectedStrategy.entry_conditions,
-        order_type: selectedStrategy.order_type,
+        name: sel.name,
+        symbols: sel.symbols,
+        timeframe: sel.timeframe,
+        tp_percent: sel.tp_percent,
+        sl_percent: sel.sl_percent,
+        amount_usdt: sel.amount_usdt,
+        entry_conditions: sel.entry_conditions,
+        order_type: sel.order_type,
       };
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/ai/analyze`, {
+      const res = await fetch(`${baseURL}/api/ai/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -170,183 +214,149 @@ export default function AIAnalysisPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setStreamText(`❌ Error: ${err.detail || res.statusText}`);
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        setError(`❌ ${err.detail || res.statusText}`);
         setLoading(false);
         return;
       }
 
       const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
       if (!reader) { setLoading(false); return; }
 
-      let buffer = '';
+      const decoder = new TextDecoder();
+      let buf = '';
 
       while (true) {
-        const { done: rdDone, value } = await reader.read();
-        if (rdDone) break;
+        const { done: rd, value } = await reader.read();
+        if (rd) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
+        buf += decoder.decode(value, { stream: true });
+        const chunks = buf.split('\n\n');
+        buf = chunks.pop() ?? '';
 
-        for (const part of parts) {
-          const line = part.trim();
+        for (const chunk of chunks) {
+          const line = chunk.trim();
           if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6);
-          if (data === '[DONE]') {
+          const raw = line.slice(6);
+          if (raw === '[DONE]') {
             setDone(true);
             setLoading(false);
+            reader.cancel();
             return;
           }
           try {
-            const payload = JSON.parse(data);
-            if (payload.text) {
-              setStreamText(prev => prev + payload.text);
+            const parsed = JSON.parse(raw);
+            if (parsed.text) {
+              setStreamText(prev => prev + parsed.text);
             }
           } catch {
-            // ignore malformed
+            // ignore
           }
         }
       }
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setStreamText(prev => prev + '\n\n❌ Stream interrupted.');
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name === 'AbortError') return;
+      setError(`❌ ${e instanceof Error ? e.message : 'Connection error'}`);
     } finally {
       setLoading(false);
     }
-  }, [symbol, exchange, timeframe, lang, strategyId, strategies]);
+  }, [symbol, exchange, timeframe, lang, strategyId, strategies, loading]);
 
   const handleStop = () => {
-    if (abortRef.current) abortRef.current.abort();
+    abortRef.current?.abort();
     setLoading(false);
   };
 
-  const signalStyle = signal ? SIGNAL_COLORS[signal] ?? SIGNAL_COLORS['NEUTRAL'] : null;
+  const sigStyle = signal ? SIGNALS[signal] : null;
 
   return (
     <>
       <Nav />
+
       <style>{`
-        .ai-output {
-          font-family: inherit;
-          line-height: 1.75;
-          color: var(--fg);
-        }
-        .ai-h1 { font-size: 1.4rem; font-weight: 700; margin: 1rem 0 0.5rem; color: var(--accent); }
-        .ai-h2 { font-size: 1.2rem; font-weight: 700; margin: 1rem 0 0.4rem; color: var(--accent); }
-        .ai-h3 { font-size: 1rem;   font-weight: 700; margin: 0.8rem 0 0.3rem; }
-        .ai-p  { margin: 0.5rem 0; }
-        .ai-li { margin: 0.25rem 0 0.25rem 1.25rem; list-style: disc; }
-        .ai-li-num { list-style: decimal; }
-        .ai-hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
-        .ai-code {
-          background: var(--bg);
-          border: 1px solid var(--border);
-          border-radius: 6px;
-          padding: 0.75rem 1rem;
-          overflow-x: auto;
-          font-size: 0.85rem;
-          margin: 0.5rem 0;
-        }
-        .ai-cursor::after {
-          content: '▋';
-          animation: blink 1s step-end infinite;
-          color: var(--accent);
-        }
         @keyframes blink {
           0%, 100% { opacity: 1; }
-          50%       { opacity: 0; }
-        }
-        .pulse-dot {
-          width: 8px; height: 8px; border-radius: 50%;
-          background: var(--accent);
-          animation: pulse 1.2s ease-in-out infinite;
+          50% { opacity: 0; }
         }
         @keyframes pulse {
           0%, 100% { transform: scale(1); opacity: 1; }
-          50%       { transform: scale(1.5); opacity: 0.5; }
+          50% { transform: scale(1.4); opacity: 0.5; }
+        }
+        .pulse-dot {
+          width: 7px; height: 7px; border-radius: 50%;
+          background: var(--accent);
+          animation: pulse 1.1s ease-in-out infinite;
+          display: inline-block;
         }
       `}</style>
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem' }}>
 
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold mb-1">{t('aiAnalysisTitle')}</h1>
-          <p style={{ color: 'var(--fg-muted)', fontSize: '0.9rem' }}>{t('aiAnalysisSubtitle')}</p>
+        {/* Title */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.3rem' }}>
+            {t('aiAnalysisTitle')}
+          </h1>
+          <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)' }}>
+            {t('aiAnalysisSubtitle')}
+          </p>
         </div>
 
-        {/* Not enabled warning */}
+        {/* Not configured warning */}
         {enabled === false && (
-          <div className="rounded-xl p-4 mb-6 text-sm"
-            style={{ background: '#450a0a', color: '#fca5a5', border: '1px solid #dc2626' }}>
+          <div style={{ background: '#450a0a', color: '#fca5a5', border: '1px solid #dc2626', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.875rem' }}>
             🔑 {t('aiNotEnabled')}
           </div>
         )}
 
         {/* Config card */}
-        <div className="rounded-xl p-5 mb-6"
-          style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
+        <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem', marginBottom: '1.25rem' }}>
 
-          <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-
-            {/* Symbol */}
+          {/* Row 1: symbol / exchange / timeframe */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--fg-muted)' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--fg-muted)', marginBottom: '0.35rem' }}>
                 {t('symbolLabel')}
               </label>
               <input
                 value={symbol}
                 onChange={e => setSymbol(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
                 placeholder={t('symbolPlaceholder')}
-                className="w-full input-field text-sm font-mono"
-                style={{ letterSpacing: '0.05em' }}
+                className="input-field"
+                style={{ width: '100%', fontFamily: 'monospace', letterSpacing: '0.04em' }}
                 disabled={loading}
               />
             </div>
-
-            {/* Exchange */}
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--fg-muted)' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--fg-muted)', marginBottom: '0.35rem' }}>
                 {t('exchange')}
               </label>
-              <select
-                value={exchange}
-                onChange={e => setExchange(e.target.value)}
-                className="w-full input-field text-sm"
-                disabled={loading}
-              >
+              <select value={exchange} onChange={e => setExchange(e.target.value)} className="input-field" style={{ width: '100%' }} disabled={loading}>
                 <option value="binance">Binance</option>
                 <option value="bybit">Bybit</option>
               </select>
             </div>
-
-            {/* Timeframe */}
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--fg-muted)' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--fg-muted)', marginBottom: '0.35rem' }}>
                 {t('timeframe')}
               </label>
-              <select
-                value={timeframe}
-                onChange={e => setTimeframe(e.target.value)}
-                className="w-full input-field text-sm"
-                disabled={loading}
-              >
+              <select value={timeframe} onChange={e => setTimeframe(e.target.value)} className="input-field" style={{ width: '100%' }} disabled={loading}>
                 {TIMEFRAMES.map(tf => <option key={tf} value={tf}>{tf}</option>)}
               </select>
             </div>
           </div>
 
           {/* Strategy selector */}
-          <div className="mt-4">
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--fg-muted)' }}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--fg-muted)', marginBottom: '0.35rem' }}>
               {t('selectStrategy')}
             </label>
             <select
               value={strategyId ?? ''}
               onChange={e => setStrategyId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full input-field text-sm"
+              className="input-field"
+              style={{ width: '100%' }}
               disabled={loading}
             >
               <option value="">{t('noStrategy')}</option>
@@ -358,105 +368,88 @@ export default function AIAnalysisPage() {
             </select>
           </div>
 
-          {/* Analyze button */}
-          <div className="flex gap-3 mt-5 items-center">
+          {/* Buttons + signal */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
               onClick={handleAnalyze}
               disabled={loading || enabled === false || !symbol.trim()}
-              className="btn-primary px-6 py-2.5 text-sm font-semibold"
-              style={{ minWidth: 140 }}
+              className="btn-primary"
+              style={{ padding: '0.55rem 1.5rem', fontSize: '0.875rem', fontWeight: 600, minWidth: 130 }}
             >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="pulse-dot" />
-                  {t('analyzing')}
-                </span>
-              ) : t('analyzeBtn')}
+              {loading
+                ? <><span className="pulse-dot" style={{ marginRight: 6 }} />{t('analyzing')}</>
+                : t('analyzeBtn')
+              }
             </button>
 
             {loading && (
               <button
                 onClick={handleStop}
-                className="btn-secondary px-4 py-2.5 text-sm"
-                style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                className="btn-secondary"
+                style={{ padding: '0.55rem 1rem', fontSize: '0.875rem', color: 'var(--danger)' }}
               >
                 ⏹ Stop
               </button>
             )}
 
-            {/* Signal badge */}
-            {signal && signalStyle && (
-              <div className="ml-auto px-4 py-2 rounded-lg font-bold text-sm"
-                style={{
-                  background: signalStyle.bg,
-                  color: signalStyle.text,
-                  border: `1px solid ${signalStyle.border}`,
-                  letterSpacing: '0.05em',
-                }}>
+            {signal && sigStyle && (
+              <div style={{ marginLeft: 'auto', padding: '0.4rem 1rem', borderRadius: 8, fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.05em', background: sigStyle.bg, color: sigStyle.color, border: `1px solid ${sigStyle.border}` }}>
                 {signal}
               </div>
             )}
           </div>
         </div>
 
-        {/* Output card */}
-        {(streamText || loading) && (
-          <div className="rounded-xl overflow-hidden"
-            style={{ border: '1px solid var(--border)', background: 'var(--panel)' }}>
+        {/* Error */}
+        {error && (
+          <div style={{ background: '#450a0a', color: '#fca5a5', border: '1px solid #dc2626', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
+            {error}
+          </div>
+        )}
 
-            {/* Output header bar */}
-            <div className="px-5 py-3 flex items-center gap-3"
-              style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
-              <span className="text-xs font-semibold" style={{ color: 'var(--fg-muted)' }}>
-                🤖 {t('aiPowered')}
-              </span>
+        {/* Output */}
+        {(streamText || loading) && (
+          <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+            {/* Header bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.1rem', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--fg-muted)' }}>🤖 {t('aiPowered')}</span>
               {loading && (
-                <span className="ml-auto flex items-center gap-2 text-xs" style={{ color: 'var(--accent)' }}>
+                <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--accent)' }}>
                   <span className="pulse-dot" style={{ width: 6, height: 6 }} />
                   {t('analyzing')}
                 </span>
               )}
               {done && !loading && (
-                <span className="ml-auto text-xs" style={{ color: '#4ade80' }}>
-                  ✅ {t('analysisReady')}
-                </span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#4ade80' }}>✅ {t('analysisReady')}</span>
               )}
             </div>
 
-            {/* Scrollable output */}
-            <div
-              ref={outputRef}
-              className="px-5 py-5 overflow-y-auto ai-output"
-              style={{ maxHeight: '65vh', minHeight: 200 }}
-            >
-              {streamText ? (
-                <div
-                  className={loading ? 'ai-cursor' : ''}
-                  dangerouslySetInnerHTML={{
-                    __html: '<p class="ai-p">' + renderMarkdown(streamText) + '</p>'
-                  }}
-                />
-              ) : (
-                <div className="flex items-center gap-3 h-24" style={{ color: 'var(--fg-muted)' }}>
-                  <span className="pulse-dot" />
-                  <span className="text-sm">{t('analyzing')}</span>
-                </div>
-              )}
+            {/* Content */}
+            <div style={{ padding: '1.25rem', maxHeight: '70vh', overflowY: 'auto' }}>
+              {streamText
+                ? <MarkdownOutput text={streamText} streaming={loading} />
+                : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--fg-muted)', padding: '2rem 0' }}>
+                    <span className="pulse-dot" />
+                    <span style={{ fontSize: '0.875rem' }}>{t('analyzing')}</span>
+                  </div>
+                )
+              }
+              <div ref={bottomRef} />
             </div>
           </div>
         )}
 
         {/* Empty state */}
-        {!streamText && !loading && (
-          <div className="rounded-xl p-10 text-center"
-            style={{ border: '1px dashed var(--border)', color: 'var(--fg-muted)' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🤖</div>
-            <p className="text-sm">{t('aiAnalysisSubtitle')}</p>
+        {!streamText && !loading && !error && (
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--fg-muted)' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🤖</div>
+            <p style={{ fontSize: '0.875rem' }}>{t('aiAnalysisSubtitle')}</p>
           </div>
         )}
 
         {/* Disclaimer */}
-        <p className="text-xs mt-4 text-center" style={{ color: 'var(--fg-muted)' }}>
+        <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--fg-muted)', marginTop: '1.25rem' }}>
           {t('aiDisclaimer')}
         </p>
 
