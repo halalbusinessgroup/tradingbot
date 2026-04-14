@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Nav from '@/components/Nav';
 import { useI18n } from '@/lib/i18n';
-import { API } from '@/lib/api';
+import { api } from '@/lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -94,17 +94,15 @@ export default function AIAnalysisPage() {
 
   // Check if AI is enabled on server
   useEffect(() => {
-    API.get('/api/ai/enabled')
-      .then(r => r.json())
-      .then(d => setEnabled(d.enabled))
+    api.get('/api/ai/enabled')
+      .then(r => setEnabled(r.data.enabled))
       .catch(() => setEnabled(false));
   }, []);
 
   // Load user's strategies for the optional dropdown
   useEffect(() => {
-    API.get('/api/strategies')
-      .then(r => r.json())
-      .then(d => setStrategies(Array.isArray(d) ? d : []))
+    api.get('/api/strategies')
+      .then(r => setStrategies(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
   }, []);
 
