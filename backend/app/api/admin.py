@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Date
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 from app.database import get_db
 from app.models.user import User
@@ -190,6 +190,75 @@ def user_trades(user_id: int, limit: int = 50,
         }
         for t in trades
     ]
+
+
+@router.get("/users/financial-overview")
+def financial_overview(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    """Per-user financial overview: PnL breakdown, win rate, best/worst trade, open trade value."""
+    users = db.query(User).order_by(User.id.asc()).all()
+    result = []
+    for u in users:
+        closed = db.query(Trade).filter(
+            Trade.user_id == u.id,
+            Trade.status != "OPEN",
+            Trade.paper_trade == False,
+        ).all()
+        open_trades = db.query(Trade).filter(
+            Trade.user_id == u.id,
+            Trade.status == "OPEN",
+            Trade.paper_trade == False,
+        ).all()
+        paper_trades = db.query(Trade).filter(
+            Trade.user_id == u.id,
+            Trade.paper_trade == True,
+        ).all()
+
+        pnl_list = [t.pnl or 0.0 for t in closed]
+        total_pnl  = round(sum(pnl_list), 4)
+        total_profit = round(sum(p for p in pnl_list if p > 0), 4)
+        total_loss   = round(sum(p for p in pnl_list if p < 0), 4)
+        wins         = sum(1 for p in pnl_list if p > 0)
+        losses       = sum(1 for p in pnl_list if p < 0)
+        total_closed = len(closed)
+        win_rate     = round(wins / total_closed * 100, 1) if total_closed > 0 else 0.0
+
+        best_trade  = round(max(pnl_list), 4) if pnl_list else None
+        worst_trade = round(min(pnl_list), 4) if pnl_list else None
+
+        # Open trade estimated value = sum(qty * entry_price)
+        open_value = round(
+            sum((t.qty or 0) * (t.entry_price or 0) for t in open_trades), 4
+        )
+
+        # Paper trading stats
+        paper_pnl_list = [t.pnl or 0.0 for t in paper_trades if t.status != "OPEN"]
+        paper_pnl = round(sum(paper_pnl_list), 4)
+
+        # Avg trade PnL
+        avg_pnl = round(total_pnl / total_closed, 4) if total_closed > 0 else 0.0
+
+        result.append({
+            "user_id":      u.id,
+            "email":        u.email,
+            "first_name":   u.first_name or "",
+            "last_name":    u.last_name or "",
+            "bot_enabled":  u.bot_enabled,
+            "total_pnl":    total_pnl,
+            "total_profit": total_profit,
+            "total_loss":   total_loss,
+            "win_rate":     win_rate,
+            "wins":         wins,
+            "losses":       losses,
+            "total_closed": total_closed,
+            "open_trades":  len(open_trades),
+            "open_value":   open_value,
+            "best_trade":   best_trade,
+            "worst_trade":  worst_trade,
+            "avg_pnl":      avg_pnl,
+            "paper_pnl":    paper_pnl,
+            "paper_trades": len(paper_trades),
+        })
+    return result
 
 
 @router.get("/logs")

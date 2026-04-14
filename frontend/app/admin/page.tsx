@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useToast } from '@/lib/toast';
 
-type TabType = 'pending' | 'users' | 'stats' | 'logs';
+type TabType = 'pending' | 'users' | 'financial' | 'stats' | 'logs';
 
 export default function AdminPage() {
   const { t } = useI18n();
@@ -17,6 +17,7 @@ export default function AdminPage() {
   const [daily, setDaily] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [userTrades, setUserTrades] = useState<{ [key: number]: any[] }>({});
+  const [financial, setFinancial] = useState<any[]>([]);
   const [myId, setMyId] = useState<number | null>(null);
 
   // Guard: only admin role may access this page
@@ -57,6 +58,13 @@ export default function AdminPage() {
     } catch {}
   }
 
+  async function loadFinancial() {
+    try {
+      const { data } = await api.get('/api/admin/users/financial-overview');
+      setFinancial(data);
+    } catch {}
+  }
+
   useEffect(() => {
     load();
     loadDaily();
@@ -66,6 +74,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (tab === 'logs') loadLogs();
+    if (tab === 'financial') loadFinancial();
   }, [tab]);
 
   async function approve(userId: number, approved: boolean) {
@@ -166,12 +175,13 @@ export default function AdminPage() {
 
         {/* Tab navigation */}
         <div className="flex gap-2 flex-wrap">
-          {(['pending', 'users', 'stats', 'logs'] as TabType[]).map(t2 => (
+          {(['pending', 'users', 'financial', 'stats', 'logs'] as TabType[]).map(t2 => (
             <button key={t2} onClick={() => setTab(t2)}
               className={`btn text-sm ${tab === t2 ? 'btn-primary' : 'btn-secondary'}`}>
-              {t2 === 'pending' ? `⏳ ${t('pendingApproval')} (${pending.length})` :
-               t2 === 'users' ? `👥 ${t('allUsers')}` :
-               t2 === 'stats' ? `📊 ${t('tradeHistory')}` :
+              {t2 === 'pending'   ? `⏳ ${t('pendingApproval')} (${pending.length})` :
+               t2 === 'users'     ? `👥 ${t('allUsers')}` :
+               t2 === 'financial' ? `💰 ${t('financialOverview')}` :
+               t2 === 'stats'     ? `📊 ${t('tradeHistory')}` :
                `📋 ${t('botLogsTitle')}`}
             </button>
           ))}
@@ -324,6 +334,118 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* FINANCIAL OVERVIEW */}
+        {tab === 'financial' && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+              <h2 className="font-bold">💰 {t('financialOverview')}</h2>
+              <button onClick={loadFinancial} className="btn btn-secondary text-sm">↻ {t('refresh')}</button>
+            </div>
+            {financial.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)' }}>{t('noData')}</p>
+            ) : (
+              <>
+                {/* Summary row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                  {(() => {
+                    const totalPnl = financial.reduce((s, u) => s + u.total_pnl, 0);
+                    const totalProfit = financial.reduce((s, u) => s + u.total_profit, 0);
+                    const totalLoss = financial.reduce((s, u) => s + u.total_loss, 0);
+                    const avgWinRate = financial.length ? financial.reduce((s, u) => s + u.win_rate, 0) / financial.length : 0;
+                    return (
+                      <>
+                        <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('totalPnl')}</div>
+                          <div className="text-lg font-bold mt-1" style={{ color: totalPnl >= 0 ? '#22c55e' : '#ef4444' }}>
+                            {totalPnl >= 0 ? '+' : ''}{totalPnl.toFixed(2)} USDT
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('totalProfit')}</div>
+                          <div className="text-lg font-bold mt-1" style={{ color: '#22c55e' }}>+{totalProfit.toFixed(2)} USDT</div>
+                        </div>
+                        <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('totalLoss')}</div>
+                          <div className="text-lg font-bold mt-1" style={{ color: '#ef4444' }}>{totalLoss.toFixed(2)} USDT</div>
+                        </div>
+                        <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('avgWinRate')}</div>
+                          <div className="text-lg font-bold mt-1" style={{ color: '#60a5fa' }}>{avgWinRate.toFixed(1)}%</div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Per-user table */}
+                <div className="overflow-x-auto">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>{t('pnl')}</th>
+                        <th>{t('totalProfit')}</th>
+                        <th>{t('totalLoss')}</th>
+                        <th>{t('winRate')}</th>
+                        <th>W / L</th>
+                        <th>{t('openTrades')}</th>
+                        <th>{t('openValue')}</th>
+                        <th>{t('bestTrade')}</th>
+                        <th>{t('worstTrade')}</th>
+                        <th>{t('avgPnl')}</th>
+                        <th>📄 Paper</th>
+                        <th>Bot</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {financial.map(u => (
+                        <tr key={u.user_id}>
+                          <td className="text-xs">{u.user_id}</td>
+                          <td className="text-xs" style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {u.first_name ? `${u.first_name} ${u.last_name}` : u.email}
+                          </td>
+                          <td style={{ color: u.total_pnl >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                            {u.total_pnl >= 0 ? '+' : ''}{u.total_pnl}
+                          </td>
+                          <td style={{ color: '#22c55e' }}>+{u.total_profit}</td>
+                          <td style={{ color: '#ef4444' }}>{u.total_loss}</td>
+                          <td>
+                            <div className="flex items-center gap-1">
+                              <div style={{ width: 40, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                                <div style={{ width: `${u.win_rate}%`, height: '100%', background: '#22c55e', borderRadius: 3 }} />
+                              </div>
+                              <span style={{ fontSize: 11 }}>{u.win_rate}%</span>
+                            </div>
+                          </td>
+                          <td className="text-xs">{u.wins}W / {u.losses}L</td>
+                          <td>{u.open_trades}</td>
+                          <td className="text-xs">{u.open_value > 0 ? `$${u.open_value}` : '—'}</td>
+                          <td style={{ color: '#22c55e', fontSize: 12 }}>{u.best_trade !== null ? `+${u.best_trade}` : '—'}</td>
+                          <td style={{ color: '#ef4444', fontSize: 12 }}>{u.worst_trade !== null ? u.worst_trade : '—'}</td>
+                          <td style={{ color: u.avg_pnl >= 0 ? '#22c55e' : '#ef4444', fontSize: 12 }}>
+                            {u.avg_pnl >= 0 ? '+' : ''}{u.avg_pnl}
+                          </td>
+                          <td className="text-xs" style={{ color: '#60a5fa' }}>{u.paper_pnl >= 0 ? '+' : ''}{u.paper_pnl}</td>
+                          <td>
+                            <span style={{
+                              fontSize: 11, padding: '2px 6px', borderRadius: 4,
+                              background: u.bot_enabled ? '#1a3a2a' : '#1e1e1e',
+                              color: u.bot_enabled ? '#22c55e' : '#666',
+                            }}>
+                              {u.bot_enabled ? '▶ ON' : '⏸ OFF'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
 

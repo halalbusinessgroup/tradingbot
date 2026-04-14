@@ -101,12 +101,90 @@ const TIMEFRAMES = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h'
 const ORDER_TYPES = ['market', 'limit', 'stop_market', 'stop_limit'] as const;
 
 const INDICATOR_GROUPS = [
-  { label: 'Trend',    items: ['EMA', 'SMA', 'MACD', 'VWAP'] },
-  { label: 'Momentum', items: ['RSI', 'STOCH_K', 'STOCH_D', 'WILLIAMS_R', 'CCI'] },
-  { label: 'Volatility', items: ['BB_UPPER', 'BB_LOWER', 'BB_MIDDLE', 'BB_PERCENT', 'ATR'] },
-  { label: 'Volume',   items: ['OBV', 'VOLUME'] },
-  { label: 'Other',    items: ['PRICE'] },
+  { label: 'Trend', items: [
+    'EMA', 'SMA', 'WMA', 'VWMA', 'HMA', 'DEMA', 'TEMA', 'KAMA',
+    'EMA_CROSS_ABOVE', 'EMA_CROSS_BELOW', 'SMA_CROSS_ABOVE', 'SMA_CROSS_BELOW',
+    'SUPERTREND_BULLISH', 'SUPERTREND',
+    'PARABOLIC_SAR_BULLISH', 'PARABOLIC_SAR',
+    'ICHIMOKU_ABOVE_CLOUD', 'ICHIMOKU_BELOW_CLOUD', 'ICHIMOKU_TENKAN', 'ICHIMOKU_KIJUN',
+  ]},
+  { label: 'Momentum', items: [
+    'RSI', 'STOCH_RSI_K', 'STOCH_RSI_D',
+    'STOCH_K', 'STOCH_D',
+    'MACD', 'MACD_SIGNAL', 'MACD_HISTOGRAM', 'MACD_CROSS_ABOVE', 'MACD_CROSS_BELOW',
+    'CCI', 'WILLIAMS_R', 'MOMENTUM', 'ROC',
+    'ULTIMATE_OSCILLATOR', 'AWESOME_OSCILLATOR',
+  ]},
+  { label: 'Volume', items: [
+    'OBV', 'VWAP', 'AD_LINE', 'CMF', 'MFI', 'VOLUME_OSCILLATOR', 'VOLUME',
+  ]},
+  { label: 'Volatility', items: [
+    'BB_UPPER', 'BB_LOWER', 'BB_MIDDLE', 'BB_PERCENT', 'BB_WIDTH',
+    'PRICE_ABOVE_BB', 'PRICE_BELOW_BB',
+    'ATR', 'STD_DEV',
+    'KC_UPPER', 'KC_LOWER', 'KC_MIDDLE', 'PRICE_ABOVE_KC', 'PRICE_BELOW_KC',
+    'DC_UPPER', 'DC_LOWER', 'DC_MIDDLE',
+  ]},
+  { label: 'Market Structure', items: [
+    'MARKET_STRUCTURE_UPTREND', 'MARKET_STRUCTURE_DOWNTREND',
+    'HH', 'HL', 'LH', 'LL',
+    'TREND_SHIFT_BULLISH', 'TREND_SHIFT_BEARISH',
+  ]},
+  { label: 'SMC', items: [
+    'BULLISH_BOS', 'BEARISH_BOS',
+    'BULLISH_CHOCH', 'BEARISH_CHOCH',
+    'BULLISH_FVG', 'BEARISH_FVG',
+    'BULLISH_OB', 'BEARISH_OB',
+    'EQUAL_HIGHS', 'EQUAL_LOWS',
+    'BULLISH_SWEEP', 'BEARISH_SWEEP',
+    'IN_PREMIUM', 'IN_DISCOUNT',
+  ]},
+  { label: 'Fibonacci', items: [
+    'NEAR_FIB_236', 'NEAR_FIB_382', 'NEAR_FIB_500', 'NEAR_FIB_618', 'NEAR_FIB_786',
+  ]},
+  { label: 'Candlestick', items: [
+    'HAMMER', 'INVERTED_HAMMER', 'SHOOTING_STAR', 'DOJI', 'SPINNING_TOP',
+    'BULLISH_ENGULFING', 'BEARISH_ENGULFING',
+    'BULLISH_HARAMI', 'BEARISH_HARAMI',
+    'PIERCING_LINE', 'DARK_CLOUD_COVER',
+    'MORNING_STAR', 'EVENING_STAR',
+    'THREE_WHITE_SOLDIERS', 'THREE_BLACK_CROWS',
+    'BULLISH_MARUBOZU', 'BEARISH_MARUBOZU',
+  ]},
+  { label: 'Chart Patterns', items: [
+    'DOUBLE_TOP', 'DOUBLE_BOTTOM',
+  ]},
+  { label: 'Breakout', items: [
+    'BULLISH_BREAKOUT', 'BEARISH_BREAKOUT',
+  ]},
+  { label: 'Price', items: ['PRICE'] },
 ];
+
+// Indicators that use DETECTED op (boolean, no numeric value needed)
+const BOOLEAN_INDICATORS = new Set([
+  'EMA_CROSS_ABOVE','EMA_CROSS_BELOW','SMA_CROSS_ABOVE','SMA_CROSS_BELOW','WMA_CROSS_ABOVE','WMA_CROSS_BELOW',
+  'MACD_CROSS_ABOVE','MACD_CROSS_BELOW',
+  'SUPERTREND_BULLISH','PARABOLIC_SAR_BULLISH',
+  'ICHIMOKU_ABOVE_CLOUD','ICHIMOKU_BELOW_CLOUD',
+  'PRICE_ABOVE_BB','PRICE_BELOW_BB','PRICE_ABOVE_KC','PRICE_BELOW_KC',
+  'MARKET_STRUCTURE_UPTREND','MARKET_STRUCTURE_DOWNTREND',
+  'HH','HL','LH','LL','TREND_SHIFT_BULLISH','TREND_SHIFT_BEARISH',
+  'BULLISH_BOS','BEARISH_BOS','BULLISH_CHOCH','BEARISH_CHOCH',
+  'BULLISH_FVG','BEARISH_FVG','BULLISH_OB','BEARISH_OB',
+  'EQUAL_HIGHS','EQUAL_LOWS','BULLISH_SWEEP','BEARISH_SWEEP',
+  'IN_PREMIUM','IN_DISCOUNT',
+  'NEAR_FIB_236','NEAR_FIB_382','NEAR_FIB_500','NEAR_FIB_618','NEAR_FIB_786',
+  'HAMMER','INVERTED_HAMMER','SHOOTING_STAR','DOJI','SPINNING_TOP',
+  'BULLISH_ENGULFING','BEARISH_ENGULFING','BULLISH_HARAMI','BEARISH_HARAMI',
+  'PIERCING_LINE','DARK_CLOUD_COVER','MORNING_STAR','EVENING_STAR',
+  'THREE_WHITE_SOLDIERS','THREE_BLACK_CROWS','BULLISH_MARUBOZU','BEARISH_MARUBOZU',
+  'DOUBLE_TOP','DOUBLE_BOTTOM','BULLISH_BREAKOUT','BEARISH_BREAKOUT',
+]);
+
+// Indicators that need a 2nd period (period2) — for MA crossovers
+const NEEDS_PERIOD2 = new Set([
+  'EMA_CROSS_ABOVE','EMA_CROSS_BELOW','SMA_CROSS_ABOVE','SMA_CROSS_BELOW','WMA_CROSS_ABOVE','WMA_CROSS_BELOW',
+]);
 
 const defaultForm = () => ({
   name: '',
@@ -127,7 +205,7 @@ const defaultForm = () => ({
   stopTriggerPrice: '' as string | number,
   noConditions: false,
   webhookMode: false,
-  conditions: [{ indicator: 'RSI', period: 14, op: '<', value: 30 }],
+  conditions: [{ indicator: 'RSI', period: 14, period2: 26, op: '<', value: 30 }],
   // Advanced
   trailingSl: '' as string | number,
   trailingTp: '' as string | number,
@@ -189,7 +267,7 @@ export default function StrategyPage() {
       stopTriggerPrice: cfg.stop_trigger_price || '',
       noConditions: !cfg.entry_conditions || cfg.entry_conditions.length === 0,
       webhookMode: !!cfg.webhook_mode,
-      conditions: cfg.entry_conditions?.length ? cfg.entry_conditions : [{ indicator: 'RSI', period: 14, op: '<', value: 30 }],
+      conditions: cfg.entry_conditions?.length ? cfg.entry_conditions : [{ indicator: 'RSI', period: 14, period2: 26, op: '<', value: 30 }],
       trailingSl: cfg.trailing_sl || '',
       trailingTp: cfg.trailing_tp || '',
       trailingTpActivation: cfg.trailing_tp_activation || 3,
@@ -322,7 +400,16 @@ export default function StrategyPage() {
 
   function updateCondition(i: number, field: string, val: any) {
     const next = [...form.conditions];
-    next[i] = { ...next[i], [field]: (field === 'period' || field === 'value') ? +val : val };
+    const numFields = ['period', 'period2', 'value'];
+    next[i] = { ...next[i], [field]: numFields.includes(field) ? +val : val };
+    // Auto-set op to DETECTED when switching to a boolean indicator
+    if (field === 'indicator' && BOOLEAN_INDICATORS.has(val)) {
+      next[i] = { ...next[i], op: 'DETECTED' };
+    }
+    // Reset op to '<' when switching from boolean to numeric
+    if (field === 'indicator' && !BOOLEAN_INDICATORS.has(val) && next[i].op === 'DETECTED') {
+      next[i] = { ...next[i], op: '<' };
+    }
     setForm(f => ({ ...f, conditions: next }));
   }
 
@@ -567,33 +654,79 @@ export default function StrategyPage() {
               </div>
             ) : (
               <>
-                {form.conditions.map((c, i) => (
-                  <div key={i} className="flex gap-2 mb-2 flex-wrap items-center">
-                    <select className="input" style={{ maxWidth: 130 }} value={c.indicator}
-                      onChange={e => updateCondition(i, 'indicator', e.target.value)}>
-                      {INDICATOR_GROUPS.map(g => (
-                        <optgroup key={g.label} label={g.label}>
-                          {g.items.map(ind => <option key={ind}>{ind}</option>)}
-                        </optgroup>
-                      ))}
-                    </select>
-                    <input className="input" style={{ maxWidth: 80 }} type="number" placeholder="period"
-                      value={c.period} onChange={e => updateCondition(i, 'period', e.target.value)} />
-                    <select className="input" style={{ maxWidth: 70 }} value={c.op}
-                      onChange={e => updateCondition(i, 'op', e.target.value)}>
-                      <option>{'<'}</option><option>{'<='}</option><option>{'>'}</option><option>{'>='}</option>
-                    </select>
-                    <input className="input" style={{ maxWidth: 90 }} type="number" step="any" value={c.value}
-                      onChange={e => updateCondition(i, 'value', e.target.value)} />
-                    <button type="button" className="btn btn-danger"
-                      onClick={() => setForm(f => ({ ...f, conditions: f.conditions.filter((_, j) => j !== i) }))}>
-                      ×
-                    </button>
-                  </div>
-                ))}
+                {form.conditions.map((c, i) => {
+                  const isBool = BOOLEAN_INDICATORS.has(c.indicator);
+                  const needsP2 = NEEDS_PERIOD2.has(c.indicator);
+                  return (
+                    <div key={i} className="flex gap-2 mb-2 flex-wrap items-center p-2 rounded-lg"
+                      style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                      {/* Indicator select */}
+                      <select className="input" style={{ maxWidth: 170, fontSize: 12 }} value={c.indicator}
+                        onChange={e => updateCondition(i, 'indicator', e.target.value)}>
+                        {INDICATOR_GROUPS.map(g => (
+                          <optgroup key={g.label} label={g.label}>
+                            {g.items.map(ind => <option key={ind} value={ind}>{ind}</option>)}
+                          </optgroup>
+                        ))}
+                      </select>
+
+                      {/* Period 1 */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{needsP2 ? t('period') + ' 1' : t('period')}</span>
+                        <input className="input" style={{ maxWidth: 70, fontSize: 12 }} type="number" min="1"
+                          value={c.period} onChange={e => updateCondition(i, 'period', e.target.value)} />
+                      </div>
+
+                      {/* Period 2 (for crossovers) */}
+                      {needsP2 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{t('period')} 2</span>
+                          <input className="input" style={{ maxWidth: 70, fontSize: 12 }} type="number" min="1"
+                            value={c.period2 || 26} onChange={e => updateCondition(i, 'period2', e.target.value)} />
+                        </div>
+                      )}
+
+                      {/* Operator or DETECTED badge */}
+                      {isBool ? (
+                        <span className="px-3 py-1 rounded-lg text-xs font-bold"
+                          style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid #22c55e' }}>
+                          ✓ DETECTED
+                        </span>
+                      ) : (
+                        <select className="input" style={{ maxWidth: 65, fontSize: 12 }} value={c.op}
+                          onChange={e => updateCondition(i, 'op', e.target.value)}>
+                          <option value="<">{'<'}</option>
+                          <option value="<=">{'<='}</option>
+                          <option value=">">{'>'}</option>
+                          <option value=">=">{'>='}</option>
+                          <option value="==">{'=='}</option>
+                          <option value="PRICE_ABOVE">price &gt;</option>
+                          <option value="PRICE_BELOW">price &lt;</option>
+                        </select>
+                      )}
+
+                      {/* Value (only for numeric indicators) */}
+                      {!isBool && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{t('value')}</span>
+                          <input className="input" style={{ maxWidth: 90, fontSize: 12 }} type="number" step="any"
+                            value={c.value} onChange={e => updateCondition(i, 'value', e.target.value)} />
+                        </div>
+                      )}
+
+                      {/* Remove button */}
+                      <button type="button"
+                        onClick={() => setForm(f => ({ ...f, conditions: f.conditions.filter((_, j) => j !== i) }))}
+                        style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', color: '#ef4444',
+                          borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 14, fontWeight: 'bold' }}>
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
                 <button type="button" className="btn btn-secondary text-sm"
-                  onClick={() => setForm(f => ({ ...f, conditions: [...f.conditions, { indicator: 'RSI', period: 14, op: '<', value: 30 }] }))}>
-                  {t('addCondition')}
+                  onClick={() => setForm(f => ({ ...f, conditions: [...f.conditions, { indicator: 'RSI', period: 14, period2: 26, op: '<', value: 30 }] }))}>
+                  + {t('addCondition')}
                 </button>
               </>
             )}
