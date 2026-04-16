@@ -214,15 +214,35 @@ export default function AIAnalysisPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        setError(`❌ ${err.detail || res.statusText}`);
+        let detail = res.statusText;
+        try { const j = await res.json(); detail = j.detail || detail; } catch {}
+        setError(`❌ ${res.status}: ${detail}`);
         setLoading(false);
         return;
       }
 
-      const reader = res.body?.getReader();
-      if (!reader) { setLoading(false); return; }
+      // Try streaming first; fall back to full-response (Cloudflare buffer)
+      const contentType = res.headers.get('content-type') || '';
+      const isSSE = contentType.includes('event-stream');
 
+      if (!isSSE || !res.body) {
+        // Cloudflare or proxy buffered the whole response — read as text
+        const text = await res.text();
+        const lines = text.split('\n');
+        let out = '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') break;
+          try { const p = JSON.parse(raw); if (p.text) out += p.text; } catch {}
+        }
+        setStreamText(out || '⚠️ Empty response from server.');
+        setDone(true);
+        setLoading(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
 
@@ -246,12 +266,8 @@ export default function AIAnalysisPage() {
           }
           try {
             const parsed = JSON.parse(raw);
-            if (parsed.text) {
-              setStreamText(prev => prev + parsed.text);
-            }
-          } catch {
-            // ignore
-          }
+            if (parsed.text) setStreamText(prev => prev + parsed.text);
+          } catch { /* ignore */ }
         }
       }
     } catch (e: unknown) {
@@ -372,7 +388,7 @@ export default function AIAnalysisPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
               onClick={handleAnalyze}
-              disabled={loading || enabled === false || !symbol.trim()}
+              disabled={loading || !symbol.trim()}
               className="btn-primary"
               style={{ padding: '0.55rem 1.5rem', fontSize: '0.875rem', fontWeight: 600, minWidth: 130 }}
             >
