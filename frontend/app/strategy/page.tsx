@@ -300,8 +300,18 @@ const INDICATOR_GROUPS = [
     'BULLISH_FVG', 'BEARISH_FVG',
     'BULLISH_OB', 'BEARISH_OB',
     'EQUAL_HIGHS', 'EQUAL_LOWS',
+    'EQH', 'EQL',
     'BULLISH_SWEEP', 'BEARISH_SWEEP',
     'IN_PREMIUM', 'IN_DISCOUNT',
+  ]},
+  { label: 'Liquidity', items: [
+    // Buyside / Sellside Liquidity pools
+    'BSL', 'SSL',
+    'AT_BSL', 'AT_SSL',
+    'BSL_SWEEP', 'SSL_SWEEP',
+    // Key daily/weekly levels
+    'PDH', 'PDL',
+    'PWH', 'PWL',
   ]},
   { label: 'Fibonacci', items: [
     'NEAR_FIB_236', 'NEAR_FIB_382', 'NEAR_FIB_500', 'NEAR_FIB_618', 'NEAR_FIB_786',
@@ -339,6 +349,11 @@ const BOOLEAN_INDICATORS = new Set([
   'BULLISH_FVG','BEARISH_FVG','BULLISH_OB','BEARISH_OB',
   'EQUAL_HIGHS','EQUAL_LOWS','BULLISH_SWEEP','BEARISH_SWEEP',
   'IN_PREMIUM','IN_DISCOUNT',
+  'EQUAL_HIGHS','EQUAL_LOWS','EQH','EQL',
+  // Liquidity — all boolean (DETECTED)
+  'BSL','SSL','AT_BSL','AT_SSL','BSL_SWEEP','SSL_SWEEP',
+  // PDH/PDL/PWH/PWL default to DETECTED (price near level)
+  'PDH','PDL','PWH','PWL',
   'NEAR_FIB_236','NEAR_FIB_382','NEAR_FIB_500','NEAR_FIB_618','NEAR_FIB_786',
   'HAMMER','INVERTED_HAMMER','SHOOTING_STAR','DOJI','SPINNING_TOP',
   'BULLISH_ENGULFING','BEARISH_ENGULFING','BULLISH_HARAMI','BEARISH_HARAMI',

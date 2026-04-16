@@ -1108,6 +1108,167 @@ def _detect_fvg_50(highs: List[float], lows: List[float], closes: List[float]) -
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  LIQUIDITY CONCEPTS  (PDH / PDL / PWH / PWL / BSL / SSL / Sweeps)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def previous_day_high(highs: List[float], period: int = 24) -> Optional[float]:
+    """PDH — Previous Day High.
+    Returns the highest high of the previous `period` candles (excludes current candle).
+    On 1h charts: period=24 → previous 24h high.
+    """
+    if len(highs) < period + 1:
+        return None
+    return max(highs[-(period + 1):-1])
+
+
+def previous_day_low(lows: List[float], period: int = 24) -> Optional[float]:
+    """PDL — Previous Day Low.
+    Returns the lowest low of the previous `period` candles (excludes current candle).
+    """
+    if len(lows) < period + 1:
+        return None
+    return min(lows[-(period + 1):-1])
+
+
+def previous_week_high(highs: List[float], period: int = 168) -> Optional[float]:
+    """PWH — Previous Week High.
+    Returns the highest high of the previous `period` candles (default 168 = 7 days on 1h).
+    """
+    return previous_day_high(highs, period)
+
+
+def previous_week_low(lows: List[float], period: int = 168) -> Optional[float]:
+    """PWL — Previous Week Low.
+    Returns the lowest low of the previous `period` candles (default 168 = 7 days on 1h).
+    """
+    return previous_day_low(lows, period)
+
+
+def _detect_buyside_liquidity(highs: List[float], lows: List[float], closes: List[float],
+                               lookback: int = 50, tolerance_pct: float = 0.15) -> dict:
+    """BSL — Buyside Liquidity.
+
+    Represents clusters of Buy-Stop orders sitting ABOVE current price:
+    - Stop losses of short sellers
+    - Breakout buyers waiting above resistance
+    - Collected at: swing highs, equal highs (EQH), PDH, PWH
+
+    Returns:
+        bsl_detected : bool  — there is at least one swing high above price (= a BSL pool)
+        at_bsl       : bool  — price is within 0.5% below the nearest BSL level
+        bsl_level    : float — nearest BSL price level above current price
+    """
+    if len(highs) < lookback:
+        return {"bsl_detected": False, "at_bsl": False, "bsl_level": None}
+
+    price = closes[-1]
+    ph = _find_pivot_highs(highs[-lookback:], left=3, right=2)
+    highs_above = [(idx, val) for idx, val in ph if val > price]
+
+    if not highs_above:
+        return {"bsl_detected": False, "at_bsl": False, "bsl_level": None}
+
+    # Prefer equal-high clusters (stronger BSL) — two highs within tolerance
+    bsl_level = None
+    for i in range(len(highs_above) - 1):
+        h1, h2 = highs_above[i][1], highs_above[i + 1][1]
+        if abs(h1 - h2) <= h1 * tolerance_pct / 100:
+            bsl_level = (h1 + h2) / 2
+            break
+
+    if bsl_level is None:
+        # Fallback: nearest swing high above
+        bsl_level = min(v for _, v in highs_above)
+
+    at_bsl = 0 <= (bsl_level - price) / price * 100 <= 0.5
+
+    return {
+        "bsl_detected": True,
+        "at_bsl": at_bsl,
+        "bsl_level": round(bsl_level, 8),
+    }
+
+
+def _detect_sellside_liquidity(highs: List[float], lows: List[float], closes: List[float],
+                                lookback: int = 50, tolerance_pct: float = 0.15) -> dict:
+    """SSL — Sellside Liquidity.
+
+    Represents clusters of Sell-Stop orders sitting BELOW current price:
+    - Stop losses of long traders
+    - Breakout sellers waiting below support
+    - Collected at: swing lows, equal lows (EQL), PDL, PWL
+
+    Returns:
+        ssl_detected : bool  — there is at least one swing low below price (= a SSL pool)
+        at_ssl       : bool  — price is within 0.5% above the nearest SSL level
+        ssl_level    : float — nearest SSL price level below current price
+    """
+    if len(lows) < lookback:
+        return {"ssl_detected": False, "at_ssl": False, "ssl_level": None}
+
+    price = closes[-1]
+    pl = _find_pivot_lows(lows[-lookback:], left=3, right=2)
+    lows_below = [(idx, val) for idx, val in pl if val < price]
+
+    if not lows_below:
+        return {"ssl_detected": False, "at_ssl": False, "ssl_level": None}
+
+    # Prefer equal-low clusters (stronger SSL)
+    ssl_level = None
+    for i in range(len(lows_below) - 1):
+        l1, l2 = lows_below[i][1], lows_below[i + 1][1]
+        if abs(l1 - l2) <= l1 * tolerance_pct / 100:
+            ssl_level = (l1 + l2) / 2
+            break
+
+    if ssl_level is None:
+        # Fallback: nearest swing low below
+        ssl_level = max(v for _, v in lows_below)
+
+    at_ssl = 0 <= (price - ssl_level) / price * 100 <= 0.5
+
+    return {
+        "ssl_detected": True,
+        "at_ssl": at_ssl,
+        "ssl_level": round(ssl_level, 8),
+    }
+
+
+def _detect_bsl_sweep(highs: List[float], lows: List[float], closes: List[float],
+                      lookback: int = 30) -> bool:
+    """BSL Sweep — Buyside Liquidity Sweep (Bearish).
+
+    Smart money swept the buy-stop orders above a swing high:
+    → Last candle wicked ABOVE a pivot high but CLOSED BELOW it.
+    Signal: Bearish reversal after liquidity grab.
+    """
+    if len(closes) < lookback + 3:
+        return False
+    ph = _find_pivot_highs(highs[-lookback:], left=3, right=2)
+    if not ph:
+        return False
+    level = ph[-1][1]
+    return highs[-1] > level and closes[-1] < level
+
+
+def _detect_ssl_sweep(highs: List[float], lows: List[float], closes: List[float],
+                      lookback: int = 30) -> bool:
+    """SSL Sweep — Sellside Liquidity Sweep (Bullish).
+
+    Smart money swept the sell-stop orders below a swing low:
+    → Last candle wicked BELOW a pivot low but CLOSED ABOVE it.
+    Signal: Bullish reversal after liquidity grab.
+    """
+    if len(closes) < lookback + 3:
+        return False
+    pl = _find_pivot_lows(lows[-lookback:], left=3, right=2)
+    if not pl:
+        return False
+    level = pl[-1][1]
+    return lows[-1] < level and closes[-1] > level
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  CANDLESTICK PATTERNS
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1762,6 +1923,94 @@ def evaluate_condition(ohlcv: List[list], cond: dict) -> bool:
     if name == "BEARISH_FVG_50":
         result = _detect_fvg_50(highs, lows, closes)
         return result.get("bearish_fvg_50", False)
+
+    # EQH / EQL short-name aliases
+    if name == "EQH":
+        ehl = _detect_equal_highs_lows(highs, lows, lookback=max(period, 20))
+        return ehl.get("equal_highs", False)
+
+    if name == "EQL":
+        ehl = _detect_equal_highs_lows(highs, lows, lookback=max(period, 20))
+        return ehl.get("equal_lows", False)
+
+    # ═══════════════════════════════
+    #  LIQUIDITY CONCEPTS
+    # ═══════════════════════════════
+
+    # PDH — Previous Day High (default period=24 for 1h candles)
+    if name == "PDH":
+        pdh = previous_day_high(highs, period=max(period, 1))
+        if op == "DETECTED":
+            # DETECTED = price is at/near PDH (within 0.3%)
+            return pdh is not None and abs(closes[-1] - pdh) / pdh <= 0.003
+        if op == "PRICE_ABOVE":
+            return pdh is not None and closes[-1] > pdh
+        if op == "PRICE_BELOW":
+            return pdh is not None and closes[-1] < pdh
+        return num_cmp(pdh)
+
+    # PDL — Previous Day Low
+    if name == "PDL":
+        pdl = previous_day_low(lows, period=max(period, 1))
+        if op == "DETECTED":
+            return pdl is not None and abs(closes[-1] - pdl) / pdl <= 0.003
+        if op == "PRICE_ABOVE":
+            return pdl is not None and closes[-1] > pdl
+        if op == "PRICE_BELOW":
+            return pdl is not None and closes[-1] < pdl
+        return num_cmp(pdl)
+
+    # PWH — Previous Week High (default period=168 for 1h candles = 7 days)
+    if name == "PWH":
+        p = period if period > 24 else 168
+        pwh = previous_week_high(highs, period=p)
+        if op == "DETECTED":
+            return pwh is not None and abs(closes[-1] - pwh) / pwh <= 0.003
+        if op == "PRICE_ABOVE":
+            return pwh is not None and closes[-1] > pwh
+        if op == "PRICE_BELOW":
+            return pwh is not None and closes[-1] < pwh
+        return num_cmp(pwh)
+
+    # PWL — Previous Week Low
+    if name == "PWL":
+        p = period if period > 24 else 168
+        pwl = previous_week_low(lows, period=p)
+        if op == "DETECTED":
+            return pwl is not None and abs(closes[-1] - pwl) / pwl <= 0.003
+        if op == "PRICE_ABOVE":
+            return pwl is not None and closes[-1] > pwl
+        if op == "PRICE_BELOW":
+            return pwl is not None and closes[-1] < pwl
+        return num_cmp(pwl)
+
+    # BSL — Buyside Liquidity detected above current price
+    if name in ("BSL", "BUYSIDE_LIQUIDITY"):
+        bsl = _detect_buyside_liquidity(highs, lows, closes, lookback=max(period, 30))
+        return bsl.get("bsl_detected", False)
+
+    # AT_BSL — Price approaching BSL level (within 0.5%)
+    if name == "AT_BSL":
+        bsl = _detect_buyside_liquidity(highs, lows, closes, lookback=max(period, 30))
+        return bsl.get("at_bsl", False)
+
+    # SSL — Sellside Liquidity detected below current price
+    if name in ("SSL", "SELLSIDE_LIQUIDITY"):
+        ssl = _detect_sellside_liquidity(highs, lows, closes, lookback=max(period, 30))
+        return ssl.get("ssl_detected", False)
+
+    # AT_SSL — Price approaching SSL level (within 0.5%)
+    if name == "AT_SSL":
+        ssl = _detect_sellside_liquidity(highs, lows, closes, lookback=max(period, 30))
+        return ssl.get("at_ssl", False)
+
+    # BSL_SWEEP — Smart money swept buyside liquidity (bearish reversal)
+    if name in ("BSL_SWEEP", "BUYSIDE_SWEEP"):
+        return _detect_bsl_sweep(highs, lows, closes, lookback=max(period, 20))
+
+    # SSL_SWEEP — Smart money swept sellside liquidity (bullish reversal)
+    if name in ("SSL_SWEEP", "SELLSIDE_SWEEP"):
+        return _detect_ssl_sweep(highs, lows, closes, lookback=max(period, 20))
 
     # ═══════════════════════════════
     #  FIBONACCI
