@@ -26,6 +26,19 @@ class Settings(BaseSettings):
     # Anthropic AI Analysis
     ANTHROPIC_API_KEY: str = ""
 
+    # TA Signal Engine
+    SIGNAL_SYMBOLS: str = "BTCUSDT,ETHUSDT,BNBUSDT"   # comma-separated
+    SIGNAL_EXCHANGE: str = "binance"
+    SIGNAL_TIMEFRAME: str = "1h"
+    SIGNAL_INTERVAL_MINUTES: int = 30          # how often to scan
+    SIGNAL_COOLDOWN_HOURS: int = 3             # min gap between same signal
+    SIGNAL_THRESHOLD_STRONG: float = 7.0
+    SIGNAL_THRESHOLD_WEAK: float = 4.0
+    SIGNAL_RISK_MULT: float = 1.5
+    SIGNAL_TP1_MULT: float = 2.0
+    SIGNAL_TP2_MULT: float = 3.5
+    SIGNAL_TELEGRAM_CHAT_ID: str = ""          # Telegram chat/channel ID for signals
+
     # SMTP (email verification)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

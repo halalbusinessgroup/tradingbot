@@ -17,7 +17,12 @@ celery_app.conf.update(
             "task": "app.workers.bot_worker.scan_all_users",
             "schedule": 30.0,
         },
+        "ta-signal-scan": {
+            "task": "app.workers.signal_worker.run_signal_scan",
+            "schedule": settings.SIGNAL_INTERVAL_MINUTES * 60,
+        },
     },
 )
 
-import app.workers.bot_worker  # noqa
+import app.workers.bot_worker    # noqa
+import app.workers.signal_worker  # noqa

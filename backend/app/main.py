@@ -5,10 +5,12 @@ from sqlalchemy import text
 from app.config import settings
 from app.database import Base, engine, SessionLocal
 from app.models.user import User
+from app.models.signal import Signal  # noqa — ensure table is registered
 from app.core.security import hash_password
 from app.api import auth, users, strategies, trades, admin, backtest
 from app.api import webhook
 from app.api import ai
+from app.api import signals
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("tradingbot")
@@ -37,6 +39,7 @@ app.include_router(admin.router)
 app.include_router(backtest.router)
 app.include_router(webhook.router)
 app.include_router(ai.router)
+app.include_router(signals.router)
 
 
 # ── Auto-migration: safely add missing columns to existing tables ─────────────

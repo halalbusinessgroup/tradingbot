@@ -184,6 +184,14 @@ const translations: Record<Lang, Record<string, string>> = {
     // Condition editor
     value: 'Value',
     period: 'Period',
+    // TA Signals
+    signals: 'Signals',
+    signalsTitle: '📊 TA Signal Dashboard',
+    signalsSubtitle: 'Real-time score-based trading signals across all configured pairs.',
+    runSignalAnalysis: 'Run instant analysis',
+    noSignalsYet: 'No signals yet. Use the form above to run an instant analysis, or wait for the next scheduled scan.',
+    signalsDisclaimer: 'Signals are for informational purposes only — not financial advice. Always use proper risk management.',
+    analyze: '⚡ Analyze',
     // Liquidity Concepts
     liquidity: 'Liquidity',
     bsl: 'BSL — Buyside Liquidity',
@@ -383,6 +391,14 @@ const translations: Record<Lang, Record<string, string>> = {
     noData: 'Məlumat yoxdur.',
     value: 'Dəyər',
     period: 'Dövr',
+    // TA Signals
+    signals: 'Siqnallar',
+    signalsTitle: '📊 TA Siqnal Paneli',
+    signalsSubtitle: 'Bütün cüt üzrə real vaxt xal əsaslı ticarət siqnalları.',
+    runSignalAnalysis: 'Ani analiz et',
+    noSignalsYet: 'Hələ siqnal yoxdur. Yuxarıdakı formu istifadə edin.',
+    signalsDisclaimer: 'Siqnallar yalnız məlumat məqsədlidir — maliyyə məsləhəti deyil.',
+    analyze: '⚡ Analiz et',
     // Liquidity Concepts
     liquidity: 'Likvidlik',
     bsl: 'BSL — Alış Tərəfi Likvidliyi',
@@ -582,6 +598,14 @@ const translations: Record<Lang, Record<string, string>> = {
     noData: 'Veri mevcut değil.',
     value: 'Değer',
     period: 'Periyot',
+    // TA Signals
+    signals: 'Sinyaller',
+    signalsTitle: '📊 TA Sinyal Paneli',
+    signalsSubtitle: 'Tüm çiftler için gerçek zamanlı puan tabanlı ticaret sinyalleri.',
+    runSignalAnalysis: 'Anlık analiz yap',
+    noSignalsYet: 'Henüz sinyal yok. Yukarıdaki formu kullanın.',
+    signalsDisclaimer: 'Sinyaller yalnızca bilgilendirme amaçlıdır — finansal tavsiye değildir.',
+    analyze: '⚡ Analiz Et',
     // Liquidity Concepts
     liquidity: 'Likidite',
     bsl: 'BSL — Alış Tarafı Likiditesi',
@@ -781,6 +805,14 @@ const translations: Record<Lang, Record<string, string>> = {
     noData: 'Нет данных.',
     value: 'Значение',
     period: 'Период',
+    // TA Signals
+    signals: 'Сигналы',
+    signalsTitle: '📊 TA Панель сигналов',
+    signalsSubtitle: 'Сигналы в реальном времени для всех настроенных пар.',
+    runSignalAnalysis: 'Быстрый анализ',
+    noSignalsYet: 'Сигналов пока нет. Используйте форму выше.',
+    signalsDisclaimer: 'Сигналы носят исключительно информационный характер — не являются финансовым советом.',
+    analyze: '⚡ Анализ',
     // Liquidity Concepts
     liquidity: 'Ликвидность',
     bsl: 'BSL — Ликвидность покупателей',
@@ -980,6 +1012,14 @@ const translations: Record<Lang, Record<string, string>> = {
     noData: 'لا توجد بيانات.',
     value: 'القيمة',
     period: 'الفترة',
+    // TA Signals
+    signals: 'الإشارات',
+    signalsTitle: '📊 لوحة إشارات TA',
+    signalsSubtitle: 'إشارات تداول في الوقت الفعلي لجميع الأزواج المُهيأة.',
+    runSignalAnalysis: 'تحليل فوري',
+    noSignalsYet: 'لا توجد إشارات بعد. استخدم النموذج أعلاه.',
+    signalsDisclaimer: 'الإشارات لأغراض معلوماتية فقط — ليست نصيحة مالية.',
+    analyze: '⚡ تحليل',
     // Liquidity Concepts
     liquidity: 'السيولة',
     bsl: 'BSL — سيولة جانب الشراء',
