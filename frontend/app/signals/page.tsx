@@ -109,6 +109,24 @@ function SignalCard({ s, expanded, onToggle }: {
 }) {
   const style = SIGNAL_STYLE[s.signal] || SIGNAL_STYLE.NEUTRAL;
   const strength = Math.min(10, Math.abs(s.score)).toFixed(1);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent]       = useState<string | null>(null);
+
+  const sendTelegram = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (sending) return;
+    setSending(true);
+    setSent(null);
+    try {
+      const r = await api.post(`/api/signals/${s.id}/send-telegram`);
+      setSent(`✅ Channel: ${r.data.channel ? 'OK' : '—'} · Users: ${r.data.users_sent}/${r.data.users_total}`);
+    } catch (e: any) {
+      setSent(`❌ ${e.response?.data?.detail || 'Error'}`);
+    } finally {
+      setSending(false);
+      setTimeout(() => setSent(null), 5000);
+    }
+  };
 
   return (
     <div style={{ border: `1px solid ${style.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: '0.75rem' }}>
@@ -121,15 +139,15 @@ function SignalCard({ s, expanded, onToggle }: {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, fontSize: '1rem', color: style.color }}>{s.symbol}</span>
             <SignalBadge signal={s.signal} />
-            <span style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', background: 'var(--bg)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>
               {s.timeframe.toUpperCase()} · {s.exchange}
             </span>
           </div>
-          <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: 'var(--fg-muted)' }}>
+          <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             💰 {fmt(s.price, 6)} USDT &nbsp;·&nbsp; Score: <strong style={{ color: style.color }}>{fmtScore(s.score)}</strong> &nbsp;·&nbsp; Strength: {strength}/10
           </div>
         </div>
-        <div style={{ textAlign: 'right', fontSize: '0.7rem', color: 'var(--fg-muted)', flexShrink: 0 }}>
+        <div style={{ textAlign: 'right', fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>
           <div>{timeAgo(s.created_at)}</div>
           <div style={{ marginTop: 2 }}>{expanded ? '▲' : '▼'}</div>
         </div>
@@ -141,7 +159,7 @@ function SignalCard({ s, expanded, onToggle }: {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
             {/* Risk */}
             <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '0.75rem' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Risk Management</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Risk Management</div>
               <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <div>🛑 SL: <strong style={{ color: '#f87171' }}>{fmt(s.sl, 4)}</strong></div>
                 <div>🎯 TP1: <strong style={{ color: '#4ade80' }}>{fmt(s.tp1, 4)}</strong></div>
@@ -152,7 +170,7 @@ function SignalCard({ s, expanded, onToggle }: {
 
             {/* S/R */}
             <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '0.75rem' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Support / Resistance</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Support / Resistance</div>
               <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <div>🟦 Support: <strong>{fmt(s.support, 4)}</strong></div>
                 <div>🟥 Resistance: <strong>{fmt(s.resistance, 4)}</strong></div>
@@ -164,11 +182,11 @@ function SignalCard({ s, expanded, onToggle }: {
           {/* Score breakdown */}
           {s.score_breakdown && (
             <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Score Breakdown</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Score Breakdown</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 1rem' }}>
                 {SCORE_KEYS.map(k => (
                   <div key={k}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--fg-muted)', marginBottom: 2 }}>{SCORE_LABELS[k]}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 2 }}>{SCORE_LABELS[k]}</div>
                     <ScoreBar value={s.score_breakdown![k]} />
                   </div>
                 ))}
@@ -178,23 +196,45 @@ function SignalCard({ s, expanded, onToggle }: {
 
           {/* Detail lines */}
           {s.details && (
-            <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
               {(['trend', 'momentum', 'volume', 'volatility', 'candlestick'] as const).map(section => {
                 const items = s.details![section];
                 if (!items?.length) return null;
                 return (
                   <div key={section}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
                       {SCORE_LABELS[section]}
                     </div>
                     {items.map((line, i) => (
-                      <div key={i} style={{ padding: '0.1rem 0', color: 'var(--fg)' }}>{line}</div>
+                      <div key={i} style={{ padding: '0.1rem 0', color: 'var(--text)' }}>{line}</div>
                     ))}
                   </div>
                 );
               })}
             </div>
           )}
+
+          {/* Telegram send button */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={sendTelegram}
+              disabled={sending}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '0.45rem 1rem', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer',
+                background: sending ? 'rgba(0,136,204,0.1)' : 'rgba(0,136,204,0.15)',
+                border: '1px solid #0088cc', color: '#0088cc',
+                transition: 'all 0.15s',
+              }}
+            >
+              {sending ? '⏳' : '✈️'} {sending ? 'Sending...' : 'Send to Telegram'}
+            </button>
+            {sent && (
+              <span style={{ fontSize: '0.75rem', color: sent.startsWith('✅') ? '#4ade80' : '#f87171' }}>
+                {sent}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -234,7 +274,7 @@ function AnalyzeForm({ onResult }: { onResult: (r: SignalRecord) => void }) {
 
   return (
     <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 12, padding: '1rem', marginBottom: '1.25rem' }}>
-      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--fg-muted)', marginBottom: '0.75rem', textTransform: 'uppercase' }}>
+      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase' }}>
         {t('runSignalAnalysis')}
       </div>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -309,7 +349,7 @@ export default function SignalsPage() {
         <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.25rem' }}>{t('signalsTitle')}</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--fg-muted)' }}>{t('signalsSubtitle')}</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('signalsSubtitle')}</p>
           </div>
           <button onClick={load} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
             ↻ {t('refresh')}
@@ -327,7 +367,7 @@ export default function SignalsPage() {
             ))}
             <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.6rem 0.8rem', textAlign: 'center' }}>
               <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{stats.total}</div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--fg-muted)' }}>Total ({stats.days}d)</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Total ({stats.days}d)</div>
             </div>
           </div>
         )}
@@ -351,11 +391,11 @@ export default function SignalsPage() {
 
         {/* Signal list */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--fg-muted)' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
             ⏳ {t('loading')}
           </div>
         ) : displayed.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem 1rem', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--fg-muted)' }}>
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📊</div>
             <p style={{ fontSize: '0.875rem' }}>{t('noSignalsYet')}</p>
           </div>
@@ -370,7 +410,7 @@ export default function SignalsPage() {
           ))
         )}
 
-        <p style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--fg-muted)', marginTop: '1.5rem' }}>
+        <p style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1.5rem' }}>
           ⚠️ {t('signalsDisclaimer')}
         </p>
       </main>

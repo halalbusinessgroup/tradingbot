@@ -11,7 +11,10 @@
   --text-muted: #8b949e;
   --accent: #22c55e;
   --danger: #ef4444;
-  --input-bg: #0b0e14;
+  --input-bg: #161b26;
+  /* aliases used in newer pages */
+  --fg: #e6edf3;
+  --fg-muted: #8b949e;
 }
 
 /* ── Light theme ── */
@@ -24,6 +27,8 @@ html.light {
   --accent: #16a34a;
   --danger: #dc2626;
   --input-bg: #f7fafc;
+  --fg: #1a202c;
+  --fg-muted: #4a5568;
 }
 
 html, body {
@@ -59,7 +64,7 @@ input, select, textarea, button { font-size: 16px; } /* prevent iOS zoom */
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-danger:hover { opacity: 0.85; }
 
-.input {
+.input, .input-field {
   width: 100%;
   background: var(--input-bg);
   border: 1px solid var(--border);
@@ -69,7 +74,7 @@ input, select, textarea, button { font-size: 16px; } /* prevent iOS zoom */
   outline: none;
   transition: border 0.15s;
 }
-.input:focus { border-color: var(--accent); }
+.input:focus, .input-field:focus { border-color: var(--accent); }
 
 .label { font-size: 0.875rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
 

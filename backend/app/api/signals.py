@@ -136,6 +136,39 @@ def analyze_now(
     return result
 
 
+# ─── POST /api/signals/{id}/send-telegram ────────────────────────────────────
+
+@router.post("/{signal_id}/send-telegram")
+def send_signal_to_telegram(
+    signal_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Manually send a stored signal to Telegram (channel + all linked users)."""
+    row = db.query(Signal).filter(Signal.id == signal_id).first()
+    if not row:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Signal not found")
+
+    try:
+        blob = json.loads(row.details_json or "{}")
+        message = blob.get("telegram_message", "")
+    except Exception:
+        message = ""
+
+    if not message:
+        # Fallback: build a minimal message
+        message = (
+            f"📊 <b>{row.signal}</b> — {row.symbol}\n"
+            f"Score: {row.score:+.1f} | Price: {row.price}\n"
+            f"SL: {row.sl} | TP1: {row.tp1} | TP2: {row.tp2}"
+        )
+
+    from app.workers.signal_worker import _broadcast
+    stats = _broadcast(message, db)
+    return {"ok": True, "channel": stats["channel"], "users_sent": stats["users_sent"], "users_total": stats["users_total"]}
+
+
 # ─── GET /api/signals/config ──────────────────────────────────────────────────
 
 @router.get("/config")

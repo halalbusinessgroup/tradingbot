@@ -840,7 +840,7 @@ export default function StrategyPage() {
                   const needsP2 = NEEDS_PERIOD2.has(c.indicator);
                   return (
                     <div key={i} className="flex gap-2 mb-2 flex-wrap items-center p-2 rounded-lg"
-                      style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                      style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
                       {/* Searchable indicator picker */}
                       <IndicatorSearch
                         value={c.indicator}
