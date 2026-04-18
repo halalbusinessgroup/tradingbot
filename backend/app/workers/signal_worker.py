@@ -51,12 +51,27 @@ def _send_telegram(message: str, chat_id: str) -> bool:
         return False
 
 
-def _broadcast_to_global(message: str) -> bool:
-    if not settings.SIGNAL_TELEGRAM_CHAT_ID:
+def _get_global_chat_id(db=None) -> str:
+    """Get signal channel chat_id: DB override first, then env."""
+    if db:
+        try:
+            from app.models.bot_setting import BotSetting
+            row = db.query(BotSetting).filter(BotSetting.key == "signal_telegram_chat_id").first()
+            if row and row.value:
+                return row.value
+        except Exception:
+            pass
+    return settings.SIGNAL_TELEGRAM_CHAT_ID
+
+
+def _broadcast_to_global(message: str, db=None) -> bool:
+    chat_id = _get_global_chat_id(db)
+    if not chat_id:
+        log.warning("[signal] No global chat_id configured — skipping global broadcast")
         return False
-    ok = _send_telegram(message, settings.SIGNAL_TELEGRAM_CHAT_ID)
+    ok = _send_telegram(message, chat_id)
     if ok:
-        log.info("[signal] ✅ Sent to global channel/group")
+        log.info(f"[signal] ✅ Sent to global channel {chat_id}")
     return ok
 
 
@@ -86,7 +101,7 @@ def _broadcast_to_user(message: str, user, db) -> dict:
 
 def _broadcast(message: str, db) -> dict:
     """Legacy: send to global channel + ALL active users (used by manual send button)."""
-    channel_ok = _broadcast_to_global(message)
+    channel_ok = _broadcast_to_global(message, db)
     users_sent = 0
     users: List[User] = (
         db.query(User)
@@ -251,7 +266,7 @@ def run_signal_scan():
 
             if signal != NEUTRAL and _cooldown_ok(db, symbol, exchange, timeframe, signal, cooldown):
                 message = result["telegram_message"]
-                _broadcast_to_global(message)
+                _broadcast_to_global(message, db)
 
                 total_personal = 0
                 total_groups   = 0

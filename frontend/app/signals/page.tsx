@@ -313,7 +313,7 @@ function TelegramTestButton() {
     setLoading(true);
     setResult(null);
     try {
-      const r = await api.post('/api/signals/test-telegram');
+      const r = await api.post('/api/telegram/test');
       setResult(r.data);
     } catch (e: any) {
       setResult({ error: e.response?.data?.detail || 'Xəta' });
@@ -334,7 +334,7 @@ function TelegramTestButton() {
       </button>
       {result && (
         <div style={{
-          position: 'absolute', top: '110%', right: 0, zIndex: 100, minWidth: 260,
+          position: 'absolute', top: '110%', right: 0, zIndex: 100, minWidth: 270,
           background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10,
           padding: '0.75rem', fontSize: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
         }}>
@@ -344,8 +344,8 @@ function TelegramTestButton() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--text)' }}>Telegram Test Nəticəsi:</div>
               <div>Bot token: {result.bot_token_set ? '✅ Var' : '❌ Yoxdur'}</div>
-              <div>Global kanal: {result.global_channel?.ok ? '✅ Göndərildi' : `❌ ${result.global_channel?.reason || 'Xəta'}`}</div>
-              <div>Şəxsi chat: {result.personal?.ok ? '✅ Göndərildi' : `❌ ${result.personal?.reason || 'Xəta'}`}</div>
+              <div>Global kanal: {result.global?.ok ? '✅ Göndərildi' : `❌ ${result.global?.error || 'Xəta'}`}</div>
+              <div>Şəxsi chat: {result.personal?.ok ? '✅ Göndərildi' : `❌ ${result.personal?.error || 'Xəta'}`}</div>
               {result.groups?.length > 0 && (
                 <div>Qruplar: {result.groups.filter((g: any) => g.ok).length}/{result.groups.length} göndərildi</div>
               )}

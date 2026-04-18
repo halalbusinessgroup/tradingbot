@@ -19,7 +19,6 @@ export default function Dashboard() {
   const [closedTrades, setClosedTrades] = useState<any[]>([]);
   const [balance, setBalance] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
-  const [symbol, setSymbol] = useState('BINANCE:SOLUSDT');
   const [balanceExchange, setBalanceExchange] = useState('binance');
   const [closingId, setClosingId] = useState<number | null>(null);
   const [chartPeriod, setChartPeriod] = useState<'all' | '7d' | '30d'>('all');
@@ -240,19 +239,8 @@ export default function Dashboard() {
 
         {/* Chart */}
         <div className="card">
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 className="font-bold">{t('marketChart')}</h2>
-            <select className="input" style={{ maxWidth: 180 }} value={symbol} onChange={e => setSymbol(e.target.value)}>
-              <option value="BINANCE:SOLUSDT">SOL/USDT (Binance)</option>
-              <option value="BINANCE:BTCUSDT">BTC/USDT (Binance)</option>
-              <option value="BINANCE:ETHUSDT">ETH/USDT (Binance)</option>
-              <option value="BINANCE:BNBUSDT">BNB/USDT (Binance)</option>
-              <option value="BINANCE:XRPUSDT">XRP/USDT (Binance)</option>
-              <option value="BYBIT:SOLUSDT">SOL/USDT (Bybit)</option>
-              <option value="BYBIT:BTCUSDT">BTC/USDT (Bybit)</option>
-            </select>
-          </div>
-          <TradingViewWidget symbol={symbol} />
+          <h2 className="font-bold mb-3">{t('marketChart')}</h2>
+          <TradingViewWidget symbol="BINANCE:BTCUSDT" />
         </div>
 
         {/* Open Trades */}

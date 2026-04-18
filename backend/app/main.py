@@ -8,12 +8,14 @@ from app.models.user import User
 from app.models.signal import Signal          # noqa
 from app.models.watchlist import UserWatchlist          # noqa
 from app.models.telegram_group import UserTelegramGroup # noqa
+from app.models.bot_setting import BotSetting           # noqa
 from app.core.security import hash_password
 from app.api import auth, users, strategies, trades, admin, backtest
 from app.api import webhook
 from app.api import ai
 from app.api import signals
 from app.api import watchlist
+from app.api import telegram_config
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("tradingbot")
@@ -44,6 +46,7 @@ app.include_router(webhook.router)
 app.include_router(ai.router)
 app.include_router(signals.router)
 app.include_router(watchlist.router)
+app.include_router(telegram_config.router)
 
 
 # ── Auto-migration: safely add missing columns to existing tables ─────────────
