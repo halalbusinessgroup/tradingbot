@@ -303,6 +303,65 @@ function AnalyzeForm({ onResult }: { onResult: (r: SignalRecord) => void }) {
   );
 }
 
+// ─── Telegram test button ─────────────────────────────────────────────────────
+
+function TelegramTestButton() {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult]   = useState<any>(null);
+
+  const test = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const r = await api.post('/api/signals/test-telegram');
+      setResult(r.data);
+    } catch (e: any) {
+      setResult({ error: e.response?.data?.detail || 'Xəta' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={test} disabled={loading}
+        style={{
+          padding: '0.4rem 0.8rem', fontSize: '0.8rem', cursor: loading ? 'not-allowed' : 'pointer',
+          background: 'rgba(0,136,204,0.12)', border: '1px solid #0088cc', color: '#0088cc',
+          borderRadius: 8, fontWeight: 600,
+        }}>
+        {loading ? '⏳' : '🧪'} Telegram Test
+      </button>
+      {result && (
+        <div style={{
+          position: 'absolute', top: '110%', right: 0, zIndex: 100, minWidth: 260,
+          background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10,
+          padding: '0.75rem', fontSize: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        }}>
+          {result.error ? (
+            <div style={{ color: '#f87171' }}>❌ {result.error}</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--text)' }}>Telegram Test Nəticəsi:</div>
+              <div>Bot token: {result.bot_token_set ? '✅ Var' : '❌ Yoxdur'}</div>
+              <div>Global kanal: {result.global_channel?.ok ? '✅ Göndərildi' : `❌ ${result.global_channel?.reason || 'Xəta'}`}</div>
+              <div>Şəxsi chat: {result.personal?.ok ? '✅ Göndərildi' : `❌ ${result.personal?.reason || 'Xəta'}`}</div>
+              {result.groups?.length > 0 && (
+                <div>Qruplar: {result.groups.filter((g: any) => g.ok).length}/{result.groups.length} göndərildi</div>
+              )}
+            </div>
+          )}
+          <button onClick={() => setResult(null)}
+            style={{ marginTop: 6, fontSize: '0.7rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            Bağla ×
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SignalsPage() {
@@ -346,11 +405,12 @@ export default function SignalsPage() {
       <main style={{ maxWidth: 820, margin: '0 auto', padding: '2rem 1rem' }}>
 
         {/* Title */}
-        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.25rem' }}>{t('signalsTitle')}</h1>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('signalsSubtitle')}</p>
           </div>
+          <TelegramTestButton />
           <button onClick={load} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
             ↻ {t('refresh')}
           </button>

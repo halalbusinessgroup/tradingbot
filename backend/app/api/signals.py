@@ -169,6 +169,48 @@ def send_signal_to_telegram(
     return {"ok": True, "channel": stats["channel"], "users_sent": stats["users_sent"], "users_total": stats["users_total"]}
 
 
+# ─── POST /api/signals/test-telegram ─────────────────────────────────────────
+
+@router.post("/test-telegram")
+def test_telegram(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Send a test message to verify Telegram is configured correctly."""
+    from app.workers.signal_worker import _send_telegram
+    from app.models.telegram_group import UserTelegramGroup
+    from app.config import settings
+
+    results = {}
+
+    # 1. Global channel
+    if settings.SIGNAL_TELEGRAM_CHAT_ID:
+        ok = _send_telegram("🧪 Test mesajı — Signal botu işləyir! ✅", settings.SIGNAL_TELEGRAM_CHAT_ID)
+        results["global_channel"] = {"chat_id": settings.SIGNAL_TELEGRAM_CHAT_ID, "ok": ok}
+    else:
+        results["global_channel"] = {"chat_id": None, "ok": False, "reason": "SIGNAL_TELEGRAM_CHAT_ID not set"}
+
+    # 2. User personal
+    if user.telegram_chat_id:
+        ok = _send_telegram(f"🧪 Test mesajı — Şəxsi hesabınız ({user.email}) bağlıdır! ✅", user.telegram_chat_id)
+        results["personal"] = {"chat_id": user.telegram_chat_id, "ok": ok}
+    else:
+        results["personal"] = {"chat_id": None, "ok": False, "reason": "No Telegram linked"}
+
+    # 3. User groups
+    groups = db.query(UserTelegramGroup).filter(
+        UserTelegramGroup.user_id == user.id,
+        UserTelegramGroup.is_active == True,
+    ).all()
+    results["groups"] = []
+    for g in groups:
+        ok = _send_telegram(f"🧪 Test — Qrup bağlıdır: {g.title} ✅", g.chat_id)
+        results["groups"].append({"chat_id": g.chat_id, "title": g.title, "ok": ok})
+
+    results["bot_token_set"] = bool(settings.TELEGRAM_BOT_TOKEN)
+    return results
+
+
 # ─── GET /api/signals/config ──────────────────────────────────────────────────
 
 @router.get("/config")

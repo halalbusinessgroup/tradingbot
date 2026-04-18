@@ -22,6 +22,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
+
 from app.services.exchange_service import make_public_client, to_ccxt_symbol
 from app.services.indicators import (
     closes_from_klines, highs_from_klines, lows_from_klines,
@@ -153,6 +155,63 @@ def _pivot_points(highs, lows, closes, period: int = 24) -> Optional[dict]:
     s3 = pl - 2 * (ph - p)
 
     return {"p": p, "r1": r1, "r2": r2, "r3": r3, "s1": s1, "s2": s2, "s3": s3}
+
+
+# ─── USDT Dominance (market sentiment) ────────────────────────────────────────
+
+def _fetch_usdt_dominance() -> Optional[float]:
+    """Fetch USDT market cap dominance % from CoinGecko (free, no key needed).
+    Returns e.g. 5.8 meaning USDT is 5.8% of total crypto market cap.
+    """
+    try:
+        resp = httpx.get(
+            "https://api.coingecko.com/api/v3/global",
+            timeout=8,
+            headers={"Accept": "application/json"},
+        )
+        if resp.is_success:
+            pct = resp.json().get("data", {}).get("market_cap_percentage", {})
+            val = pct.get("usdt") or pct.get("USDT")
+            if val is not None:
+                return round(float(val), 2)
+    except Exception as e:
+        log.debug(f"[signal] USDT.D fetch failed: {e}")
+    return None
+
+
+def _score_market_sentiment(usdt_d: Optional[float]) -> tuple[float, list]:
+    """USDT Dominance scoring. Max ≈ ±1.5
+    High USDT.D → fear, market selling → bearish pressure
+    Low USDT.D  → greed, market buying → bullish pressure
+    """
+    if usdt_d is None:
+        return 0.0, ["⚪ USDT.D: N/A (could not fetch)"]
+
+    score = 0.0
+    details = []
+
+    if usdt_d >= 8.0:
+        score -= 1.5
+        details.append(f"❌ USDT.D: {usdt_d:.2f}% — extreme fear, heavy selling pressure")
+    elif usdt_d >= 6.5:
+        score -= 1.0
+        details.append(f"❌ USDT.D: {usdt_d:.2f}% — elevated fear, bearish sentiment")
+    elif usdt_d >= 5.5:
+        score -= 0.5
+        details.append(f"⚠️ USDT.D: {usdt_d:.2f}% — slightly elevated, mild caution")
+    elif usdt_d <= 3.5:
+        score += 1.5
+        details.append(f"✅ USDT.D: {usdt_d:.2f}% — extreme greed, strong buying pressure")
+    elif usdt_d <= 4.5:
+        score += 1.0
+        details.append(f"✅ USDT.D: {usdt_d:.2f}% — low fear, bullish sentiment")
+    elif usdt_d <= 5.0:
+        score += 0.5
+        details.append(f"✅ USDT.D: {usdt_d:.2f}% — neutral-bullish market sentiment")
+    else:
+        details.append(f"⚪ USDT.D: {usdt_d:.2f}% — neutral market sentiment")
+
+    return round(score, 2), details
 
 
 # ─── Scoring modules ───────────────────────────────────────────────────────────
@@ -648,6 +707,11 @@ def _format_telegram(result: dict) -> str:
         for d in details["candlestick"]:
             lines.append(f"  {d}")
 
+    if details.get("sentiment"):
+        lines += ["", "── MARKET SENTIMENT (USDT.D) ──────────"]
+        for d in details["sentiment"]:
+            lines.append(f"  {d}")
+
     lines += ["", "── RISK MANAGEMENT ────────────────────"]
     if signal in (STRONG_BUY, WEAK_BUY):
         lines += [
@@ -725,6 +789,9 @@ def analyze_symbol(
     volumes = volumes_from_klines(ohlcv)
     price   = closes[-1]
 
+    # ── Fetch USDT Dominance (market sentiment) ───────────────────────────────
+    usdt_d = _fetch_usdt_dominance()
+
     # ── Run all scorers ───────────────────────────────────────────────────────
     s_trend,  d_trend  = _score_trend(highs, lows, closes, volumes)
     s_mom,    d_mom    = _score_momentum(highs, lows, closes, volumes)
@@ -732,8 +799,9 @@ def analyze_symbol(
     s_vola,   d_vola   = _score_volatility(highs, lows, closes)
     s_candle, d_candle = _score_candlestick(opens, highs, lows, closes)
     s_sr,     d_sr, levels = _score_support_resistance(highs, lows, closes)
+    s_sent,   d_sent   = _score_market_sentiment(usdt_d)
 
-    total = s_trend + s_mom + s_vol + s_vola + s_candle + s_sr
+    total = s_trend + s_mom + s_vol + s_vola + s_candle + s_sr + s_sent
 
     # ── Determine signal ──────────────────────────────────────────────────────
     if total >= threshold_strong:
@@ -761,6 +829,7 @@ def analyze_symbol(
         "atr":       round(atr_val, 6),
         "risk":      risk,
         "levels":    levels,
+        "usdt_dominance": usdt_d,
         "details": {
             "trend":      d_trend,
             "momentum":   d_mom,
@@ -768,6 +837,7 @@ def analyze_symbol(
             "volatility": d_vola,
             "candlestick": d_candle,
             "sr":         d_sr,
+            "sentiment":  d_sent,
         },
         "score_breakdown": {
             "trend":      s_trend,
@@ -776,6 +846,7 @@ def analyze_symbol(
             "volatility": s_vola,
             "candlestick": s_candle,
             "sr":         s_sr,
+            "sentiment":  s_sent,
         },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
