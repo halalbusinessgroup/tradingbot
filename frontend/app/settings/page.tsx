@@ -74,6 +74,18 @@ export default function SettingsPage() {
   const [twoFaStep, setTwoFaStep] = useState<'idle' | 'setup' | 'verify'>('idle');
   const [twoFaMsg, setTwoFaMsg] = useState('');
 
+  // Watchlist
+  const [watchlist, setWatchlist]     = useState<any[]>([]);
+  const [wlInput, setWlInput]         = useState('');
+  const [wlExchange, setWlExchange]   = useState('binance');
+  const [wlLoading, setWlLoading]     = useState(false);
+  const [wlMsg, setWlMsg]             = useState('');
+
+  // Telegram groups
+  const [tgGroups, setTgGroups]       = useState<any[]>([]);
+  const [groupToken, setGroupToken]   = useState<any>(null);
+  const [groupsMsg, setGroupsMsg]     = useState('');
+
   // Email notifications
   const [emailNotif, setEmailNotif] = useState(true);
   const [notifMsg, setNotifMsg] = useState('');
@@ -84,7 +96,16 @@ export default function SettingsPage() {
     setProfile({ first_name: data.first_name || '', last_name: data.last_name || '', phone: data.phone || '', address: data.address || '' });
     setEmailNotif(data.email_notifications ?? true);
   }
-  useEffect(() => { load(); }, []);
+
+  async function loadWatchlist() {
+    try { const { data } = await api.get('/api/users/watchlist'); setWatchlist(data); } catch {}
+  }
+
+  async function loadTgGroups() {
+    try { const { data } = await api.get('/api/users/telegram-groups'); setTgGroups(data); } catch {}
+  }
+
+  useEffect(() => { load(); loadWatchlist(); loadTgGroups(); }, []);
 
   async function saveProfile() {
     setProfileMsg('');
@@ -150,6 +171,42 @@ export default function SettingsPage() {
       setTwoFaStep('idle');
       load();
     } catch (e: any) { setTwoFaMsg('❌ ' + (e.response?.data?.detail || t('error'))); }
+  }
+
+  // Watchlist actions
+  async function addToWatchlist() {
+    const sym = wlInput.trim().toUpperCase();
+    if (!sym) return;
+    setWlLoading(true); setWlMsg('');
+    try {
+      await api.post('/api/users/watchlist', { symbol: sym, exchange: wlExchange });
+      setWlInput(''); setWlMsg('✅ ' + sym + ' əlavə edildi');
+      loadWatchlist();
+    } catch (e: any) { setWlMsg('❌ ' + (e.response?.data?.detail || 'Xəta')); }
+    finally { setWlLoading(false); }
+  }
+
+  async function removeFromWatchlist(symbol: string, exchange: string) {
+    try {
+      await api.delete(`/api/users/watchlist/${symbol}?exchange=${exchange}`);
+      loadWatchlist();
+    } catch {}
+  }
+
+  async function getGroupLinkToken() {
+    setGroupsMsg('');
+    try {
+      const { data } = await api.post('/api/users/telegram-groups/link-token');
+      setGroupToken(data);
+    } catch (e: any) { setGroupsMsg('❌ ' + (e.response?.data?.detail || 'Xəta')); }
+  }
+
+  async function removeGroup(id: number) {
+    try { await api.delete(`/api/users/telegram-groups/${id}`); loadTgGroups(); } catch {}
+  }
+
+  async function toggleGroup(id: number) {
+    try { await api.put(`/api/users/telegram-groups/${id}/toggle`); loadTgGroups(); } catch {}
   }
 
   // Email notifications toggle
@@ -291,6 +348,115 @@ export default function SettingsPage() {
           </label>
           <button onClick={saveNotifications} className="btn btn-primary">{t('saveNotifications')}</button>
           {notifMsg && <p className="text-sm">{notifMsg}</p>}
+        </div>
+
+        {/* ── Watchlist ── */}
+        <div className="card space-y-3">
+          <h2 className="font-bold">📊 İzlənilən Coinlər (Watchlist)</h2>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Bu siyahıdaki coinlər üçün siqnal gələndə Telegram-a avtomatik mesaj göndərilir.
+          </p>
+
+          {/* Current watchlist */}
+          {watchlist.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {watchlist.map((w: any) => (
+                <div key={w.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold"
+                  style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid #22c55e', color: '#22c55e' }}>
+                  <span>{w.symbol}</span>
+                  <span style={{ fontSize: 10, opacity: 0.7 }}>{w.exchange}</span>
+                  <button onClick={() => removeFromWatchlist(w.symbol, w.exchange)}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Heç bir coin əlavə edilməyib.</p>
+          )}
+
+          {/* Add coin */}
+          <div className="flex gap-2 flex-wrap">
+            <input
+              className="input" style={{ maxWidth: 160, fontFamily: 'monospace' }}
+              placeholder="BTCUSDT"
+              value={wlInput}
+              onChange={e => setWlInput(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && addToWatchlist()}
+            />
+            <select className="input" style={{ maxWidth: 120 }} value={wlExchange} onChange={e => setWlExchange(e.target.value)}>
+              <option value="binance">Binance</option>
+              <option value="bybit">Bybit</option>
+            </select>
+            <button onClick={addToWatchlist} disabled={wlLoading || !wlInput.trim()} className="btn btn-primary">
+              {wlLoading ? '⏳' : '+ Əlavə et'}
+            </button>
+          </div>
+          {wlMsg && <p className="text-sm">{wlMsg}</p>}
+        </div>
+
+        {/* ── Telegram Groups ── */}
+        <div className="card space-y-3">
+          <h2 className="font-bold">📢 Telegram Qrupları / Kanalları</h2>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Botu qrupa əlavə edib aşağıdakı tokeni qrupda göndərərək bağlayın.
+            Siqnallar həm şəxsi chatə, həm də bağlı qruplara gedəcək.
+          </p>
+
+          {/* Existing groups */}
+          {tgGroups.length > 0 && (
+            <div className="space-y-2">
+              {tgGroups.map((g: any) => (
+                <div key={g.id} className="flex items-center justify-between p-2.5 rounded-lg"
+                  style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                  <div>
+                    <span className="font-medium text-sm">{g.title || g.chat_id}</span>
+                    <span className="ml-2 text-xs" style={{ color: 'var(--text-muted)' }}>{g.chat_id}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => toggleGroup(g.id)}
+                      className="text-xs px-2 py-1 rounded"
+                      style={{
+                        background: g.is_active ? 'rgba(34,197,94,0.12)' : 'var(--bg)',
+                        border: g.is_active ? '1px solid #22c55e' : '1px solid var(--border)',
+                        color: g.is_active ? '#22c55e' : 'var(--text-muted)', cursor: 'pointer'
+                      }}>
+                      {g.is_active ? '● Aktiv' : '○ Deaktiv'}
+                    </button>
+                    <button onClick={() => removeGroup(g.id)}
+                      className="btn btn-danger text-xs px-2 py-1">Sil</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Get link token */}
+          <button onClick={getGroupLinkToken} className="btn btn-primary">
+            🔗 Yeni qrup bağlama tokeni al
+          </button>
+
+          {groupToken && (
+            <div className="p-3 rounded-lg space-y-2" style={{ background: 'var(--bg)', border: '1px solid #0088cc' }}>
+              <p className="text-sm font-semibold" style={{ color: '#0088cc' }}>📋 Addımlar:</p>
+              <ol className="text-sm space-y-1" style={{ color: 'var(--text-muted)' }}>
+                <li>1. Botu qrupa/kanala admin kimi əlavə edin</li>
+                <li>2. Qrupda bu komandanı göndərin:</li>
+              </ol>
+              <div className="flex items-center gap-2 p-2 rounded"
+                style={{ background: 'var(--panel)', border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 13 }}>
+                <code className="flex-1 break-all">{groupToken.command}</code>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(groupToken.command); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0088cc', fontSize: 12 }}>
+                  📋
+                </button>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                ⚠️ Token bir dəfə istifadə olunur. Yeni qrup üçün yenidən token alın.
+              </p>
+            </div>
+          )}
+          {groupsMsg && <p className="text-sm">{groupsMsg}</p>}
         </div>
 
         {/* Exchange Keys */}
